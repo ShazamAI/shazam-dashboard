@@ -1,0 +1,503 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════
+   BASE LAYER — Global defaults, resets, typography
+   ═══════════════════════════════════════════════════════════ */
+
+@layer base {
+  :root {
+    /* Safe area insets for notched devices */
+    --safe-area-top: env(safe-area-inset-top, 0px);
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-left: env(safe-area-inset-left, 0px);
+    --safe-area-right: env(safe-area-inset-right, 0px);
+
+    /* Motion preference */
+    --motion-duration: 1;
+    --motion-distance: 1;
+  }
+
+  /* Reduce motion for accessibility */
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --motion-duration: 0;
+      --motion-distance: 0;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  html {
+    @apply scroll-smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-surface text-gray-100 antialiased font-sans;
+  }
+
+  /* Prevent text size adjustment on orientation change */
+  * {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Selection */
+  ::selection {
+    @apply bg-shazam-500/30 text-white;
+  }
+
+  /* Focus visible — consistent keyboard navigation */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-shazam-500;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    @apply w-1.5;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-gray-800 transition-colors;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-700;
+  }
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #27272a transparent;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   COMPONENT LAYER — Reusable UI patterns
+   ═══════════════════════════════════════════════════════════ */
+
+@layer components {
+
+  /* ─── Navigation ──────────────────────────────────────── */
+
+  .sidebar-link {
+    @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium
+           text-gray-400 transition-all duration-200
+           hover:bg-gray-800 hover:text-gray-100
+           min-h-[44px];
+  }
+  .sidebar-link-active {
+    @apply bg-shazam-700/20 text-shazam-400;
+  }
+
+  /* ─── Cards — Elevation system ────────────────────────── */
+
+  .card {
+    @apply rounded-xl border border-gray-800 bg-surface-card
+           transition-all duration-250;
+  }
+  .card-interactive {
+    @apply card cursor-pointer
+           hover:border-gray-700 hover:bg-surface-card-hover
+           hover:shadow-card-hover;
+  }
+  .card-glass {
+    @apply rounded-xl border border-white/5 bg-glass
+           backdrop-blur-xl shadow-elevation-2;
+  }
+  .card-header {
+    @apply border-b border-gray-800 px-3 py-2.5
+           sm:px-4 sm:py-3 md:px-6 md:py-4;
+  }
+  .card-body {
+    @apply p-3 sm:p-4 md:p-6;
+  }
+
+  /* ─── Forms — 44px touch targets ──────────────────────── */
+
+  .input {
+    @apply w-full rounded-lg border border-gray-700 bg-gray-800
+           px-3 py-2.5 text-sm text-gray-200 placeholder-gray-500
+           transition-all duration-200
+           focus:border-shazam-500 focus:outline-none
+           focus:ring-1 focus:ring-shazam-500
+           focus:shadow-glow-sm
+           min-h-[44px];
+  }
+  .select {
+    @apply rounded-lg border border-gray-700 bg-gray-800
+           px-3 py-2.5 text-sm text-gray-200
+           transition-all duration-200
+           focus:border-shazam-500 focus:outline-none
+           focus:ring-1 focus:ring-shazam-500
+           min-h-[44px];
+  }
+
+  /* ─── Tables ──────────────────────────────────────────── */
+
+  .table-header {
+    @apply border-b border-gray-800 text-left text-[10px]
+           uppercase tracking-wider text-gray-500;
+  }
+  .table-header th {
+    @apply px-3 py-2.5 font-medium sm:px-4 md:px-6;
+  }
+  .table-row {
+    @apply border-b border-gray-800/50
+           transition-colors duration-150
+           hover:bg-gray-800/30;
+  }
+  .table-row td {
+    @apply px-3 py-3 sm:px-4 md:px-6;
+  }
+
+  /* ─── Stat Cards ──────────────────────────────────────── */
+
+  .stat-card {
+    @apply rounded-xl border border-gray-800 bg-surface-card
+           p-2.5 sm:p-3 md:p-4
+           transition-all duration-250
+           hover:border-gray-700 hover:shadow-elevation-2;
+  }
+  .stat-label {
+    @apply text-[10px] uppercase tracking-wider text-gray-500
+           sm:text-[11px] md:text-xs font-medium;
+  }
+  .stat-value {
+    @apply mt-0.5 text-lg font-bold sm:mt-1 sm:text-xl md:text-2xl
+           animate-count-up;
+  }
+
+  /* ─── Badges & Tags ───────────────────────────────────── */
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5
+           text-[10px] font-medium tracking-wide uppercase;
+  }
+  .badge-dot {
+    @apply h-1.5 w-1.5 rounded-full;
+  }
+
+  /* ─── Links ───────────────────────────────────────────── */
+
+  .entity-link {
+    @apply cursor-pointer text-shazam-400 transition-colors duration-150
+           hover:text-shazam-300 hover:underline;
+  }
+
+  /* ─── Scrollable Containers ───────────────────────────── */
+
+  .scroll-x-container {
+    @apply -mx-1 flex overflow-x-auto px-1 scrollbar-none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .scroll-x-container::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ─── Touch-friendly Target ───────────────────────────── */
+
+  .touch-target {
+    @apply relative min-h-[44px] min-w-[44px];
+  }
+
+  /* ─── Page Header ─────────────────────────────────────── */
+
+  .page-header {
+    @apply mb-4 flex flex-col gap-3
+           sm:flex-row sm:items-center sm:justify-between
+           sm:mb-6;
+  }
+  .page-title {
+    @apply text-lg font-bold text-white tracking-tight
+           sm:text-xl;
+  }
+  .page-subtitle {
+    @apply text-xs text-gray-500
+           sm:text-sm;
+  }
+
+  /* ─── Section Headings — Card / Panel headers ──────────── */
+
+  .section-title {
+    @apply text-sm font-semibold text-white
+           sm:text-base;
+  }
+  .section-subtitle {
+    @apply text-xs text-gray-500;
+  }
+
+  /* ─── Form Labels ───────────────────────────────────────── */
+
+  .form-label {
+    @apply mb-1.5 block text-xs font-medium text-gray-400;
+  }
+
+  /* ─── Data Labels — key-value pair labels ──────────────── */
+
+  .data-label {
+    @apply text-xs font-medium text-gray-500;
+  }
+  .data-value {
+    @apply text-sm text-gray-200;
+  }
+
+  /* ─── Micro Labels — uppercase tracking ────────────────── */
+
+  .micro-label {
+    @apply text-[10px] font-semibold uppercase tracking-wider text-gray-600
+           sm:text-[11px];
+  }
+
+  /* ─── Domain Color Dots (for dynamic usage) ───────────── */
+
+  .domain-dot-dashboard      { @apply bg-violet-400; }
+  .domain-dot-vscode         { @apply bg-sky-400; }
+  .domain-dot-backend        { @apply bg-emerald-400; }
+  .domain-dot-frontend       { @apply bg-violet-400; }
+  .domain-dot-infrastructure { @apply bg-orange-400; }
+  .domain-dot-design         { @apply bg-pink-400; }
+  .domain-dot-research       { @apply bg-cyan-400; }
+  .domain-dot-qa             { @apply bg-amber-400; }
+  .domain-dot-management     { @apply bg-shazam-400; }
+
+  /* ─── Skeleton Loader ─────────────────────────────────── */
+
+  .skeleton {
+    @apply rounded-lg bg-gray-800 animate-shimmer;
+    background-image: linear-gradient(
+      90deg,
+      #27272a 0%,
+      #3f3f46 50%,
+      #27272a 100%
+    );
+    background-size: 200% 100%;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   UTILITIES LAYER — Animation helpers, effects
+   ═══════════════════════════════════════════════════════════ */
+
+@layer utilities {
+
+  /* ─── Stagger Delay Helpers ───────────────────────────── */
+
+  .stagger-1 { animation-delay: 50ms; }
+  .stagger-2 { animation-delay: 100ms; }
+  .stagger-3 { animation-delay: 150ms; }
+  .stagger-4 { animation-delay: 200ms; }
+  .stagger-5 { animation-delay: 250ms; }
+  .stagger-6 { animation-delay: 300ms; }
+  .stagger-7 { animation-delay: 350ms; }
+  .stagger-8 { animation-delay: 400ms; }
+
+  /* ─── Gradient Text ───────────────────────────────────── */
+
+  .text-gradient-brand {
+    @apply bg-brand-gradient bg-clip-text text-transparent;
+  }
+
+  /* ─── Glow Effects ────────────────────────────────────── */
+
+  .glow-border-brand {
+    box-shadow:
+      0 0 0 1px rgba(255, 202, 29, 0.2),
+      0 0 15px rgba(255, 202, 29, 0.1);
+  }
+
+  .glow-border-brand-hover:hover {
+    box-shadow:
+      0 0 0 1px rgba(255, 202, 29, 0.4),
+      0 0 25px rgba(255, 202, 29, 0.15),
+      0 0 50px rgba(255, 202, 29, 0.08);
+  }
+
+  /* ─── Glass Morphism ──────────────────────────────────── */
+
+  .glass-surface {
+    @apply bg-white/[0.03] backdrop-blur-xl border border-white/[0.06];
+  }
+
+  .glass-surface-hover:hover {
+    @apply bg-white/[0.05] border-white/[0.1];
+  }
+
+  /* ─── Dot Grid Background ─────────────────────────────── */
+
+  .bg-dots {
+    background-image: radial-gradient(circle at 1px 1px, #27272a 1px, transparent 0);
+    background-size: 24px 24px;
+  }
+
+  .bg-dots-lg {
+    background-image: radial-gradient(circle at 1px 1px, #27272a 1px, transparent 0);
+    background-size: 32px 32px;
+  }
+
+  /* ─── Inner Light — Top highlight for depth ───────────── */
+
+  .inner-light {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .inner-light-brand {
+    box-shadow: inset 0 1px 0 rgba(255, 202, 29, 0.1);
+  }
+
+  /* ─── Scrollbar Hide ──────────────────────────────────── */
+
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ─── Hide scrollbar but keep functionality ───────────── */
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #27272a transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-gray-800;
+  }
+
+  /* ─── Transition Presets ──────────────────────────────── */
+
+  .transition-smooth {
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .transition-bounce-in {
+    transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .transition-spring {
+    transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   VUE TRANSITIONS — Named transitions for <Transition>
+   ═══════════════════════════════════════════════════════════ */
+
+/* Fade */
+.v-fade-enter-active { transition: opacity 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
+.v-fade-leave-active { transition: opacity 0.2s cubic-bezier(0.55, 0, 1, 0.45); }
+.v-fade-enter-from,
+.v-fade-leave-to { opacity: 0; }
+
+/* Fade Up */
+.v-fade-up-enter-active { transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+.v-fade-up-leave-active { transition: all 0.25s cubic-bezier(0.55, 0, 1, 0.45); }
+.v-fade-up-enter-from { opacity: 0; transform: translateY(12px); }
+.v-fade-up-leave-to { opacity: 0; transform: translateY(-8px); }
+
+/* Fade Down */
+.v-fade-down-enter-active { transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+.v-fade-down-leave-active { transition: all 0.25s cubic-bezier(0.55, 0, 1, 0.45); }
+.v-fade-down-enter-from { opacity: 0; transform: translateY(-12px); }
+.v-fade-down-leave-to { opacity: 0; transform: translateY(8px); }
+
+/* Scale */
+.v-scale-enter-active { transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+.v-scale-leave-active { transition: all 0.2s cubic-bezier(0.55, 0, 1, 0.45); }
+.v-scale-enter-from { opacity: 0; transform: scale(0.95); }
+.v-scale-leave-to { opacity: 0; transform: scale(0.95); }
+
+/* Slide Right (sidebar, panels) */
+.v-slide-right-enter-active { transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+.v-slide-right-leave-active { transition: all 0.25s cubic-bezier(0.55, 0, 1, 0.45); }
+.v-slide-right-enter-from { opacity: 0; transform: translateX(24px); }
+.v-slide-right-leave-to { opacity: 0; transform: translateX(24px); }
+
+/* Slide Bottom (modals, drawers) */
+.v-slide-bottom-enter-active { transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+.v-slide-bottom-leave-active { transition: all 0.25s cubic-bezier(0.55, 0, 1, 0.45); }
+.v-slide-bottom-enter-from { opacity: 0; transform: translateY(24px); }
+.v-slide-bottom-leave-to { opacity: 0; transform: translateY(16px); }
+
+/* Expand (accordion, collapse) */
+.v-expand-enter-active {
+  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: hidden;
+}
+.v-expand-leave-active {
+  transition: all 0.25s cubic-bezier(0.55, 0, 1, 0.45);
+  overflow: hidden;
+}
+.v-expand-enter-from { opacity: 0; max-height: 0; }
+.v-expand-enter-to { max-height: 500px; }
+.v-expand-leave-from { max-height: 500px; }
+.v-expand-leave-to { opacity: 0; max-height: 0; }
+
+/* List (staggered) */
+.v-list-enter-active { transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+.v-list-leave-active { transition: all 0.2s cubic-bezier(0.55, 0, 1, 0.45); position: absolute; }
+.v-list-enter-from { opacity: 0; transform: translateY(12px); }
+.v-list-leave-to { opacity: 0; transform: translateX(-12px); }
+.v-list-move { transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* Modal — backdrop + scale content */
+.v-modal-enter-active { transition: opacity 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
+.v-modal-leave-active { transition: opacity 0.2s cubic-bezier(0.55, 0, 1, 0.45); }
+.v-modal-enter-from,
+.v-modal-leave-to { opacity: 0; }
+
+.v-modal-enter-active .modal-content,
+.v-modal-leave-active .modal-content {
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.v-modal-enter-from .modal-content {
+  opacity: 0;
+  transform: scale(0.95) translateY(12px);
+}
+.v-modal-leave-to .modal-content {
+  opacity: 0;
+  transform: scale(0.98) translateY(6px);
+}
+
+/* Notification — slide in from right */
+.v-notification-enter-active { transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+.v-notification-leave-active { transition: all 0.25s cubic-bezier(0.55, 0, 1, 0.45); }
+.v-notification-enter-from { opacity: 0; transform: translateX(100%); }
+.v-notification-leave-to { opacity: 0; transform: translateX(50%); }
+
+/* Switch / Toggle — color crossfade */
+.v-switch-enter-active,
+.v-switch-leave-active { transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
+.v-switch-enter-from { opacity: 0; transform: scale(0.9); }
+.v-switch-leave-to { opacity: 0; transform: scale(0.9); }
+
+/* Collapse Height — for dynamic height panels */
+.v-collapse-enter-active {
+  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: hidden;
+}
+.v-collapse-leave-active {
+  transition: all 0.25s cubic-bezier(0.55, 0, 1, 0.45);
+  overflow: hidden;
+}
+.v-collapse-enter-from,
+.v-collapse-leave-to {
+  opacity: 0;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+}
