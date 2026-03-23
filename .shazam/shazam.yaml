@@ -1,0 +1,59 @@
+provider: claude_code  # claude_code | codex | cursor | gemini
+
+company:
+  name: Shazam Dashboard
+  mission: Autonomous AI Agent Teams for shazam.dev
+
+agents:
+  pm:
+    role: Project Manager
+    model: claude-haiku-4-5-20251001
+    budget: 200000
+    tools:
+      - Read
+      - Grep
+      - Glob
+      - WebSearch
+
+  senior_1:
+    role: Senior Developer
+    supervisor: pm
+    budget: 150000
+    tools:
+      - Read
+      - Edit
+      - Write
+      - Bash
+      - Grep
+      - Glob
+
+  senior_2:
+    role: Senior Developer
+    supervisor: pm
+    budget: 150000
+    tools:
+      - Read
+      - Edit
+      - Write
+      - Bash
+      - Grep
+      - Glob
+
+# Debug & runtime settings (same as Flutter debug panel)
+config:
+  auto_approve: false       # Skip human approval for PM subtasks
+  auto_retry: false         # Auto-retry failed tasks with backoff
+  max_concurrent: 4         # Max agents working simultaneously (1-10)
+  max_retries: 2            # Default retry attempts per failed task
+  poll_interval: 5000       # Task polling interval in ms
+  module_lock: true         # Prevent agents from editing modules owned by other hierarchies
+  peer_reassign: true       # Reassign tasks to idle peers when assigned agent is busy
+
+# Tech stack — shared with all agents as project context
+# tech_stack:
+#   language: Elixir
+#   framework: Phoenix
+#   database: PostgreSQL
+#   frontend: Flutter
+#   notes: |
+#     Additional context about the project stack
