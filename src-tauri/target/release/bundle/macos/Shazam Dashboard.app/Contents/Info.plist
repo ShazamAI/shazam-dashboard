@@ -9,7 +9,7 @@
 	<key>CFBundleExecutable</key>
 	<string>shazam-dashboard</string>
 	<key>CFBundleIconFile</key>
-	<string>Shazam Dashboard.icns</string>
+	<string>icon.icns</string>
 	<key>CFBundleIdentifier</key>
 	<string>dev.shazam.dashboard</string>
 	<key>CFBundleInfoDictionaryVersion</key>
