@@ -61,7 +61,13 @@ function normalizeEvent(raw: unknown): ShazamEvent | null {
   const obj = raw as Record<string, unknown>;
 
   // Determine the event type string
-  const eventType = (obj.type ?? obj.event) as string | undefined;
+  // Backend sends { type: "event", event: "task_completed" } — prefer obj.event when type is generic
+  let eventType: string | undefined;
+  if (obj.type === 'event' && typeof obj.event === 'string' && obj.event.length > 0) {
+    eventType = obj.event as string;
+  } else {
+    eventType = (obj.type ?? obj.event) as string | undefined;
+  }
   if (typeof eventType !== 'string' || eventType.length === 0) {
     return null;
   }

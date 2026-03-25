@@ -118,12 +118,34 @@ export function useDashboard() {
     }
   }
 
-  function handleStop() {
-    toast.info('Stop must be executed via CLI: shazam stop');
+  async function handleStop() {
+    const company = activeCompany.value?.name;
+    if (!company) {
+      toast.error('No active company');
+      return;
+    }
+    try {
+      await post('/ralph-loop/pause', { company });
+      isPaused.value = true;
+      toast.success('Task loop paused');
+    } catch (err) {
+      toast.error(normalizeError(err, 'Failed to pause loop'));
+    }
   }
 
-  function handleResume() {
-    toast.info('Resume must be executed via CLI: /resume');
+  async function handleResume() {
+    const company = activeCompany.value?.name;
+    if (!company) {
+      toast.error('No active company');
+      return;
+    }
+    try {
+      await post('/ralph-loop/resume', { company });
+      isPaused.value = false;
+      toast.success('Task loop resumed');
+    } catch (err) {
+      toast.error(normalizeError(err, 'Failed to resume loop'));
+    }
   }
 
   async function handleApproveAll() {

@@ -1,6 +1,6 @@
 import { get, post, del } from './http';
 import { extractKey, ensureArray } from './utils';
-import type { Task, TaskFilter, CreateTaskPayload, PaginatedResult } from '@/types';
+import type { Task, TaskFilter, CreateTaskPayload, PaginatedResult, Workflow, PipelineStage } from '@/types';
 
 /**
  * Backend returns: { "tasks": [{ id, status, title, description, ... }] }
@@ -21,6 +21,11 @@ interface BackendTask {
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
+  // Pipeline fields
+  workflow?: string | null;
+  pipeline?: PipelineStage[] | null;
+  current_stage?: number | null;
+  required_role?: string | null;
 }
 
 function mapTask(raw: BackendTask): Task {
@@ -37,6 +42,11 @@ function mapTask(raw: BackendTask): Task {
     result: raw.result ?? null,
     created_at: raw.created_at,
     updated_at: raw.updated_at,
+    // Pipeline fields
+    workflow: raw.workflow ?? null,
+    pipeline: raw.pipeline ?? null,
+    current_stage: raw.current_stage ?? null,
+    required_role: raw.required_role ?? null,
   };
 }
 
@@ -136,4 +146,58 @@ export async function approveAllTasks(): Promise<{ approved: number }> {
     return response as { approved: number };
   }
   return { approved: 0 };
+}
+
+// --- Pipeline Stage Actions ---
+
+export async function approveStage(taskId: string, approvedBy?: string): Promise<Task> {
+  const response = await post<unknown>(`/tasks/${encodeURIComponent(taskId)}/approve-stage`, {
+    approved_by: approvedBy ?? 'user',
+  });
+  const raw = extractKey<BackendTask>(response, 'task');
+  return mapTask(raw);
+}
+
+export async function rejectStage(taskId: string, reason: string, rejectedBy?: string): Promise<Task> {
+  const response = await post<unknown>(`/tasks/${encodeURIComponent(taskId)}/reject-stage`, {
+    reason,
+    rejected_by: rejectedBy ?? 'user',
+  });
+  const raw = extractKey<BackendTask>(response, 'task');
+  return mapTask(raw);
+}
+
+// --- Workflow API ---
+
+export async function fetchWorkflows(): Promise<Workflow[]> {
+  const response = await get<unknown>('/workflows');
+  if (response && typeof response === 'object' && 'workflows' in (response as Record<string, unknown>)) {
+    return (response as { workflows: Workflow[] }).workflows;
+  }
+  return [];
+}
+
+export async function fetchWorkflow(name: string): Promise<Workflow | null> {
+  const response = await get<unknown>(`/workflows/${encodeURIComponent(name)}`);
+  if (response && typeof response === 'object' && 'workflow' in (response as Record<string, unknown>)) {
+    return (response as { workflow: Workflow }).workflow;
+  }
+  return null;
+}
+
+export async function saveWorkflow(workflow: Workflow): Promise<void> {
+  await put<unknown>(`/workflows/${encodeURIComponent(workflow.name)}`, {
+    stages: workflow.stages,
+  });
+}
+
+export async function createWorkflow(workflow: Workflow): Promise<void> {
+  await post<unknown>('/workflows', {
+    name: workflow.name,
+    stages: workflow.stages,
+  });
+}
+
+export async function deleteWorkflow(name: string): Promise<void> {
+  await del<unknown>(`/workflows/${encodeURIComponent(name)}`);
 }

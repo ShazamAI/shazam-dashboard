@@ -40,6 +40,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'Org Chart', icon: 'org-chart' },
   },
   {
+    path: '/workflows',
+    name: 'Workflows',
+    component: () => import('@/pages/WorkflowsPage.vue'),
+    meta: { title: 'Workflows', icon: 'workflows' },
+  },
+  {
     path: '/config',
     name: 'Config',
     component: () => import('@/pages/ConfigPage.vue'),
@@ -62,6 +68,12 @@ const routes: RouteRecordRaw[] = [
     name: 'Memory',
     component: () => import('@/pages/MemoryBrowserPage.vue'),
     meta: { title: 'Memory', icon: 'memory' },
+  },
+  {
+    path: '/agent-output',
+    name: 'Agent Output',
+    component: () => import('@/pages/AgentOutputPage.vue'),
+    meta: { title: 'Agent Output', icon: 'agent-output' },
   },
   {
     path: '/sessions',

@@ -59,6 +59,17 @@ function statusAccentClass(status: string): string {
 const hasActions = computed(() => (task: Task) => {
   return ['awaiting_approval', 'pending', 'in_progress', 'paused', 'failed'].includes(task.status);
 });
+
+const hasAnyPipeline = computed(() =>
+  props.tasks.some(t => Array.isArray(t.pipeline) && t.pipeline.length > 1)
+);
+
+function stageLabel(task: Task): string | null {
+  if (!task.pipeline || task.pipeline.length <= 1 || task.current_stage == null) return null;
+  const stage = task.pipeline[task.current_stage];
+  return stage ? `${task.current_stage + 1}/${task.pipeline.length} ${stage.name}` : null;
+}
+
 </script>
 
 <template>
@@ -90,6 +101,7 @@ const hasActions = computed(() => (task: Task) => {
             <th class="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-500 sm:px-4 md:px-5">Status</th>
             <th class="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-500 sm:px-4 md:px-5">Agent</th>
             <th class="hidden px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-500 lg:table-cell sm:px-4 md:px-5">Created By</th>
+            <th v-if="hasAnyPipeline" class="hidden px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-500 xl:table-cell sm:px-4 md:px-5">Stage</th>
             <th class="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-500 sm:px-4 md:px-5">Updated</th>
             <th class="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-500 sm:px-4 md:px-5">Actions</th>
           </tr>
@@ -132,6 +144,25 @@ const hasActions = computed(() => (task: Task) => {
             </td>
             <td class="hidden px-3 py-3 lg:table-cell sm:px-4 md:px-5">
               <span class="text-xs text-gray-500">{{ task.created_by ?? '—' }}</span>
+            </td>
+            <td v-if="hasAnyPipeline" class="hidden px-3 py-3 xl:table-cell sm:px-4 md:px-5">
+              <div v-if="task.pipeline && task.pipeline.length > 1 && stageLabel(task)" class="flex items-center gap-1.5">
+                <div class="flex gap-px">
+                  <div
+                    v-for="(s, si) in (task.pipeline ?? [])"
+                    :key="si"
+                    class="h-1.5 w-3 rounded-sm"
+                    :class="{
+                      'bg-emerald-500': s.status === 'completed',
+                      'bg-blue-500 animate-pulse': s.status === 'in_progress',
+                      'bg-red-500': s.status === 'rejected',
+                      'bg-gray-700': s.status === 'pending',
+                    }"
+                  />
+                </div>
+                <span class="text-[10px] text-gray-500">{{ stageLabel(task) }}</span>
+              </div>
+              <span v-else class="text-[10px] text-gray-700">—</span>
             </td>
             <td class="px-3 py-3 sm:px-4 md:px-5">
               <span class="text-xs tabular-nums text-gray-500" :title="formatDate(task.updated_at)">

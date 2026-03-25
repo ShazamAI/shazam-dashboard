@@ -22,6 +22,25 @@ const { activeCompany, loadCompanies } = useActiveCompany();
 const { on: onWsEvent } = useWebSocket();
 
 const pagination = useTaskPagination();
+
+async function retryAllFailed() {
+  try {
+    await import('@/api/taskService').then(m => m.approveAllTasks());
+    // Actually use the WS command for retry-all
+    const { useWebSocket } = await import('@/composables/useWebSocket');
+    const ws = useWebSocket();
+    ws.sendCommand('/retry-all');
+    pagination.loadTasks();
+  } catch { /* ignore */ }
+}
+
+async function approveAllPending() {
+  try {
+    const { approveAllTasks } = await import('@/api/taskService');
+    await approveAllTasks();
+    pagination.loadTasks();
+  } catch { /* ignore */ }
+}
 const taskActions = useTaskActions({
   onTaskUpdated: pagination.updateTaskInList,
   onTaskRemoved: pagination.removeTaskFromList,
@@ -113,6 +132,12 @@ watch(
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
           {{ taskActions.showCreateForm.value ? 'Cancel' : 'New Task' }}
+        </AppButton>
+        <AppButton v-if="pagination.statusCounts.value.failed > 0" variant="secondary" size="sm" @click="retryAllFailed">
+          ↻ Retry Failed ({{ pagination.statusCounts.value.failed }})
+        </AppButton>
+        <AppButton v-if="pagination.statusCounts.value.awaiting_approval > 0" variant="secondary" size="sm" @click="approveAllPending">
+          ✓ Approve All ({{ pagination.statusCounts.value.awaiting_approval }})
         </AppButton>
       </div>
     </div>

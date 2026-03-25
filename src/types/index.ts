@@ -7,6 +7,29 @@ export type TaskStatus =
   | 'awaiting_approval'
   | 'paused';
 
+export interface PipelineStage {
+  name: string;
+  role: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'rejected';
+  assigned_to: string | null;
+  completed_by: string | null;
+  output: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface WorkflowStage {
+  name: string;
+  role: string;
+  prompt_suffix: string | null;
+  on_reject: string | null;
+}
+
+export interface Workflow {
+  name: string;
+  stages: WorkflowStage[];
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -20,6 +43,11 @@ export interface Task {
   result: unknown;
   created_at: string;
   updated_at: string;
+  // Pipeline/workflow fields
+  workflow?: string | null;
+  pipeline?: PipelineStage[] | null;
+  current_stage?: number | null;
+  required_role?: string | null;
 }
 
 // ===== Agent Types =====
@@ -207,6 +235,7 @@ export interface CreateTaskPayload {
   description?: string;
   assigned_to?: string;
   depends_on?: string;
+  workflow?: string;
 }
 
 // ===== Event Feed Display Item =====

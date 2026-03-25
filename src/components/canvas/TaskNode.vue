@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import { Handle, Position } from '@vue-flow/core';
 
+interface PipelineStageData {
+  name: string;
+  status: string;
+}
+
 interface Props {
   data: {
     id: string;
     title: string;
     status: string;
     assignedTo: string;
+    pipeline?: PipelineStageData[] | null;
+    currentStage?: number | null;
   };
 }
 
@@ -46,6 +53,25 @@ const statusIcon: Record<string, string> = {
           {{ data.status.replace('_', ' ') }} · {{ data.assignedTo }}
         </div>
       </div>
+    </div>
+
+    <!-- Pipeline mini progress -->
+    <div v-if="data.pipeline && data.pipeline.length > 1" class="flex gap-0.5 mt-1.5">
+      <div
+        v-for="(s, si) in data.pipeline"
+        :key="si"
+        class="h-1 flex-1 rounded-full"
+        :class="{
+          'bg-green-500': s.status === 'completed',
+          'bg-blue-500 animate-pulse': s.status === 'in_progress',
+          'bg-red-500': s.status === 'rejected',
+          'bg-gray-700': s.status === 'pending',
+        }"
+        :title="s.name"
+      />
+    </div>
+    <div v-if="data.pipeline && data.pipeline.length > 1 && data.currentStage != null" class="mt-0.5 text-[9px] text-gray-600">
+      {{ data.pipeline[data.currentStage]?.name }} ({{ (data.currentStage ?? 0) + 1 }}/{{ data.pipeline.length }})
     </div>
 
     <!-- Approve/Reject for awaiting tasks -->

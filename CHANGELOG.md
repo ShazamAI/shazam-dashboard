@@ -1,5 +1,38 @@
 # Changelog
 
+## v0.5.0 (2026-03-25)
+
+### Features — Workflow Pipelines
+- **Pipeline visualization** — task table shows stage column with progress indicator (colored dots per stage)
+- **Pipeline progress in canvas** — TaskNode displays mini progress bar and current stage label
+- **Workflow browser page** — `/workflows` page to browse, create, edit, and delete workflow templates with interactive node-graph canvas
+- **Workflow selection in task creation** — dropdown to select a workflow with live pipeline preview
+- **Stage approve/reject API** — taskService supports `approveStage` and `rejectStage` actions
+- **Workflow stage nodes** — custom Vue Flow node for workflow canvas visualization
+
+### Features — Dashboard Enhancements
+- **Event timeline** — real-time event timeline widget on dashboard with null-safe rendering
+- **Circuit breaker management** — reset button, resume + retry failed, resume only actions via HTTP API
+- **Health indicators** — circuit breaker status shown in dashboard health widget
+- **Notification bell** — notification center component
+- **Budget tracker** — budget tracking widget
+- **Task dependency tree** — dependency visualization component
+- **Task timeline** — timeline view for task progress
+- **Onboarding wizard** — first-run setup wizard component
+- **Agent output page** — dedicated page for viewing agent output
+
+### Features — File Browser
+- **Enhanced file browser** — improved Monaco editor integration and file tree navigation
+
+### Bug Fixes
+- **Ralph endpoint paths** — fixed pause/resume endpoints to use `/ralph-loop/` prefix
+- **Null safety** — added null/undefined handling to timeline helper functions and event type display
+- **TypeScript fixes** — resolved type safety issues in PipelineSteps, WorkflowsPage, and TaskTable
+
+### Real-time
+- **Pipeline stage events** — real-time sync handles `task_stage_advanced` and `task_stage_rejected` events
+- **WebSocket improvements** — enhanced reconnection and event handling
+
 ## v0.4.0 (2026-03-25)
 
 ### Features — Canvas Mode

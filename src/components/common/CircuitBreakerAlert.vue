@@ -1,12 +1,41 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { circuitBreakerTripped } from '@/composables/useRealtimeSync';
-import { useWebSocket } from '@/composables/useWebSocket';
+import { post } from '@/api/http';
+import { useActiveCompany } from '@/composables/useActiveCompany';
 
-const ws = useWebSocket();
+const { activeCompany } = useActiveCompany();
+const isResuming = ref(false);
+const isResetting = ref(false);
 
-function resumeAgents() {
-  ws.sendCommand('/resume');
-  circuitBreakerTripped.value = false;
+async function resetCircuitBreaker() {
+  isResetting.value = true;
+  try {
+    await post('/ralph-loop/reset-circuit-breaker', {});
+    circuitBreakerTripped.value = false;
+  } catch { /* ignore */ }
+  isResetting.value = false;
+}
+
+async function resumeAndRetry() {
+  isResuming.value = true;
+  try {
+    const company = activeCompany.value?.name;
+    // Reset circuit breaker + resume loop
+    await post('/ralph-loop/resume', { company });
+    // Retry all failed tasks
+    await post('/tasks/bulk', { action: 'retry', task_ids: [] }).catch(() => {});
+    circuitBreakerTripped.value = false;
+  } catch { /* ignore */ }
+  isResuming.value = false;
+}
+
+async function resumeOnly() {
+  try {
+    const company = activeCompany.value?.name;
+    await post('/ralph-loop/resume', { company });
+    circuitBreakerTripped.value = false;
+  } catch { /* ignore */ }
 }
 </script>
 
@@ -20,21 +49,35 @@ function resumeAgents() {
         <span class="text-lg">⚠️</span>
         <div>
           <div class="text-sm font-semibold">Circuit Breaker Triggered</div>
-          <div class="text-xs opacity-80">Agents stopped after consecutive failures. Check logs for details.</div>
+          <div class="text-xs opacity-80">Agents stopped after consecutive failures.</div>
         </div>
       </div>
       <div class="flex items-center gap-2">
         <button
           class="rounded-lg bg-white/20 px-4 py-1.5 text-xs font-medium hover:bg-white/30 transition-colors"
-          @click="resumeAgents"
+          :disabled="isResuming"
+          @click="resumeAndRetry"
         >
-          Resume Agents
+          {{ isResuming ? 'Resuming...' : 'Resume + Retry Failed' }}
         </button>
         <button
           class="rounded-lg bg-white/10 px-3 py-1.5 text-xs hover:bg-white/20 transition-colors"
+          @click="resumeOnly"
+        >
+          Resume Only
+        </button>
+        <button
+          class="rounded-lg bg-emerald-600/80 px-3 py-1.5 text-xs font-medium hover:bg-emerald-600 transition-colors"
+          :disabled="isResetting"
+          @click="resetCircuitBreaker"
+        >
+          {{ isResetting ? 'Resetting...' : 'Reset Circuit Breaker' }}
+        </button>
+        <button
+          class="rounded-lg bg-white/10 px-2 py-1.5 text-xs hover:bg-white/20 transition-colors"
           @click="circuitBreakerTripped = false"
         >
-          Dismiss
+          ✕
         </button>
       </div>
     </div>

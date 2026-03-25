@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import StatusBadge from '@/components/common/StatusBadge.vue';
 import AppButton from '@/components/common/Button.vue';
+import PipelineSteps from '@/components/features/PipelineSteps.vue';
 import type { Task } from '@/types';
 
 interface Props {
@@ -9,6 +11,10 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+const hasPipeline = computed(() =>
+  Array.isArray(props.task.pipeline) && props.task.pipeline.length > 1
+);
 
 const emit = defineEmits<{
   close: [];
@@ -57,6 +63,15 @@ function hasAnyBusy(taskId: string): boolean {
           <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>
+    </div>
+
+    <!-- Pipeline Steps -->
+    <div v-if="hasPipeline" class="border-b border-gray-800 px-3 py-3 sm:px-5 sm:py-4">
+      <PipelineSteps
+        :stages="task.pipeline!"
+        :current-stage="task.current_stage ?? 0"
+        :workflow-name="task.workflow"
+      />
     </div>
 
     <!-- Body -->

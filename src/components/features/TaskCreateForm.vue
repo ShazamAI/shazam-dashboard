@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { onMounted, ref } from 'vue';
 import AppButton from '@/components/common/Button.vue';
-import type { AgentWorker, CreateTaskPayload } from '@/types';
+import { fetchWorkflows } from '@/api/taskService';
+import type { AgentWorker, CreateTaskPayload, Workflow } from '@/types';
 
 interface Props {
   createForm: CreateTaskPayload;
@@ -15,6 +17,14 @@ const emit = defineEmits<{
   submit: [];
   cancel: [];
 }>();
+
+const workflows = ref<Workflow[]>([]);
+
+onMounted(async () => {
+  try {
+    workflows.value = await fetchWorkflows();
+  } catch { /* ignore */ }
+});
 </script>
 
 <template>
@@ -49,6 +59,31 @@ const emit = defineEmits<{
           </select>
         </div>
       </div>
+
+      <!-- Workflow selector -->
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label class="form-label">Workflow</label>
+          <select v-model="createForm.workflow" class="select w-full">
+            <option value="">No workflow (single stage)</option>
+            <option v-for="w in workflows" :key="w.name" :value="w.name">
+              {{ w.name }} ({{ w.stages.length }} stages)
+            </option>
+          </select>
+        </div>
+        <div v-if="createForm.workflow">
+          <label class="form-label">Pipeline Preview</label>
+          <div class="flex items-center gap-1 rounded-lg border border-gray-800 bg-gray-900/50 px-3 py-2">
+            <template v-for="(w, wi) in workflows.find(w => w.name === createForm.workflow)?.stages ?? []" :key="wi">
+              <span class="text-[10px] text-gray-400">{{ w.name }}</span>
+              <svg v-if="wi < (workflows.find(w2 => w2.name === createForm.workflow)?.stages.length ?? 0) - 1" class="h-3 w-3 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </template>
+          </div>
+        </div>
+      </div>
+
       <div>
         <label class="form-label">Title *</label>
         <input v-model="createForm.title" type="text" placeholder="Describe the task..." class="input" />

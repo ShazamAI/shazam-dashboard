@@ -16,6 +16,7 @@ const TASK_EVENTS = new Set([
   'task_created', 'task_completed', 'task_failed', 'task_started',
   'task_approved', 'task_rejected', 'task_killed', 'task_paused',
   'task_resumed', 'task_status_change',
+  'task_stage_advanced', 'task_stage_rejected',
 ]);
 
 const AGENT_EVENTS = new Set([
@@ -24,7 +25,8 @@ const AGENT_EVENTS = new Set([
 ]);
 
 let initialized = false;
-let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let taskDebounce: ReturnType<typeof setTimeout> | null = null;
+let agentDebounce: ReturnType<typeof setTimeout> | null = null;
 
 export function useRealtimeSync() {
   if (initialized) return;
@@ -36,12 +38,6 @@ export function useRealtimeSync() {
   const agentStore = useAgentStore();
   const eventStore = useEventStore();
 
-  // Debounced refresh — prevents hammering the API on burst events
-  function debouncedRefresh(fn: () => void, delay = 1000) {
-    if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(fn, delay);
-  }
-
   // Listen to ALL events and route to appropriate stores
   ws.on('*', (event) => {
     // Always process events in the event store (for Live Event Feed)
@@ -49,22 +45,24 @@ export function useRealtimeSync() {
 
     const company = activeCompany.value?.name;
 
-    // Task events → refresh task store
+    // Task events → refresh task store (debounced, separate timer)
     if (TASK_EVENTS.has(event.type)) {
-      debouncedRefresh(() => {
+      if (taskDebounce) clearTimeout(taskDebounce);
+      taskDebounce = setTimeout(() => {
         if (company) {
-          taskStore.load({ company });
+          taskStore.load({ company, silent: true });
         }
-      });
+      }, 800);
     }
 
-    // Agent events → refresh agent store
+    // Agent events → refresh agent store (debounced, separate timer)
     if (AGENT_EVENTS.has(event.type)) {
-      debouncedRefresh(() => {
+      if (agentDebounce) clearTimeout(agentDebounce);
+      agentDebounce = setTimeout(() => {
         if (company) {
           agentStore.load(company);
         }
-      }, 2000);
+      }, 1500);
     }
 
     // Company events → refresh company list
