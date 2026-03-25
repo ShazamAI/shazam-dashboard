@@ -28,7 +28,7 @@ async function loadProjects() {
   isLoading.value = true
   error.value = null
   try {
-    const res = await fetch('/api/projects')
+    const res = await fetch(`${'__TAURI__' in window ? 'http://127.0.0.1:4040' : ''}/api/projects`)
     if (!res.ok) throw new Error('Failed to load projects')
     const data = await res.json()
     projects.value = data.projects || []
@@ -43,7 +43,7 @@ async function addProject() {
   if (!newProjectPath.value.trim()) return
   addingProject.value = true
   try {
-    const res = await fetch('/api/projects', {
+    const res = await fetch(`${'__TAURI__' in window ? 'http://127.0.0.1:4040' : ''}/api/projects`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: newProjectPath.value.trim() }),
@@ -65,7 +65,7 @@ async function addProject() {
 async function startProject(name: string) {
   actionLoading.value = name
   try {
-    const res = await fetch(`/api/projects/${encodeURIComponent(name)}/start`, { method: 'POST' })
+    const res = await fetch(`${'__TAURI__' in window ? 'http://127.0.0.1:4040' : ''}/api/projects/${encodeURIComponent(name)}/start`, { method: 'POST' })
     if (!res.ok) {
       const data = await res.json()
       throw new Error(data.error || 'Failed to start project')
@@ -84,7 +84,7 @@ async function startProject(name: string) {
 async function stopProject(name: string) {
   actionLoading.value = name
   try {
-    await fetch(`/api/projects/${encodeURIComponent(name)}/stop`, { method: 'POST' })
+    await fetch(`${'__TAURI__' in window ? 'http://127.0.0.1:4040' : ''}/api/projects/${encodeURIComponent(name)}/stop`, { method: 'POST' })
     await loadProjects()
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to stop'
@@ -96,7 +96,7 @@ async function stopProject(name: string) {
 async function removeProject(name: string) {
   if (!confirm(`Remove "${name}" from the registry? This won't delete any files.`)) return
   try {
-    await fetch(`/api/projects/${encodeURIComponent(name)}`, { method: 'DELETE' })
+    await fetch(`${'__TAURI__' in window ? 'http://127.0.0.1:4040' : ''}/api/projects/${encodeURIComponent(name)}`, { method: 'DELETE' })
     await loadProjects()
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to remove'

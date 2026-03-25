@@ -1,4 +1,6 @@
-const BASE_URL = '/api';
+// In Tauri (production), connect directly to daemon. In dev, use Vite proxy.
+const isTauri = '__TAURI__' in window;
+const BASE_URL = isTauri ? 'http://127.0.0.1:4040/api' : '/api';
 
 interface RequestOptions {
   method?: string;

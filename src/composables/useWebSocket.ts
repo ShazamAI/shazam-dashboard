@@ -125,7 +125,9 @@ function connect() {
   if (isDestroyed) return;
   if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) return;
 
-  const url = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`;
+  // In Tauri (production), connect directly to daemon. In dev, use Vite proxy.
+  const isTauri = '__TAURI__' in window;
+  const url = isTauri ? 'ws://127.0.0.1:4040/ws' : `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`;
 
   try {
     socket = new WebSocket(url);
