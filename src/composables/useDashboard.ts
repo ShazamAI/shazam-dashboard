@@ -153,9 +153,11 @@ export function useDashboard() {
     }, LOAD_TIMEOUT_MS);
 
     try {
+      const companyName = activeCompany.value?.name;
+      const taskFilter = companyName ? { company: companyName } : undefined;
       const [c, t, e] = await Promise.allSettled([
         loadCompanies(),
-        fetchTasks(),
+        fetchTasks(taskFilter),
         fetchRecentEvents(),
       ]);
 

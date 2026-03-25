@@ -3,6 +3,7 @@ import { computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { approveTask, rejectTask, pauseTask, resumeTask, retryTask, deleteTask } from '@/api/taskService';
 import { useActiveCompany } from '@/composables/useActiveCompany';
+import { useAgentStore } from '@/stores/agents';
 import { useWebSocket } from '@/composables/useWebSocket';
 import { useToast } from '@/composables/useToast';
 import { useTaskPagination, STATUS_META } from '@/composables/useTaskPagination';
@@ -28,7 +29,9 @@ const taskActions = useTaskActions({
   toast,
 });
 
-const allAgents = computed(() => [...(activeCompany.value?.agents ?? [])]);
+// Get agents from the agent store (loaded via API with roles)
+const agentStore = useAgentStore();
+const allAgents = computed(() => agentStore.agents);
 
 // Wire up WS events
 onWsEvent('*', (event) => pagination.handleTaskWsEvent(event));

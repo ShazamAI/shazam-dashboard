@@ -1,12 +1,12 @@
 import { fetchTasks } from './taskService';
 import { fetchAgents } from './companyService';
-import type { Task, AgentWorker, PaginatedResult } from '@/types';
+import type { Task, AgentWorker, TaskFilter, PaginatedResult } from '@/types';
 
 export const COST_PER_1K_TOKENS = 0.003;
 
 /** Load tasks with graceful fallback to empty result. */
-export async function loadTasks(): Promise<PaginatedResult<Task>> {
-  return fetchTasks();
+export async function loadTasks(filter?: TaskFilter): Promise<PaginatedResult<Task>> {
+  return fetchTasks(filter);
 }
 
 /** Load agents for a given company, returning empty array on failure. */

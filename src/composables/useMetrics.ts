@@ -59,7 +59,8 @@ export function useMetrics() {
 
   async function refreshTasks() {
     try {
-      const result = await loadTasks();
+      const filter = activeCompany.value?.name ? { company: activeCompany.value.name } : undefined;
+      const result = await loadTasks(filter);
       const items = result.items;
       if (items.length > 0 || tasks.value.length === 0) {
         tasks.value = items;
@@ -71,7 +72,8 @@ export function useMetrics() {
 
   const { isLoading, error, execute: loadData } = useAsyncState(
     async () => {
-      const [, t] = await Promise.allSettled([loadCompanies(), loadTasks()]);
+      const filter = activeCompany.value?.name ? { company: activeCompany.value.name } : undefined;
+      const [, t] = await Promise.allSettled([loadCompanies(), loadTasks(filter)]);
       if (t.status === 'fulfilled') {
         tasks.value = t.value.items;
       }
