@@ -1,4 +1,4 @@
-import { fetchAgents, createAgent, updateAgents, fetchOrgChart } from './companyService';
+import { fetchAgents, createAgent, updateAgent, fetchOrgChart } from './companyService';
 import { fetchSessionPool } from './configService';
 import { fetchTasks } from './taskService';
 import type { AgentWorker, AgentStatus, OrgChartNode, CreateAgentPayload } from '@/types';
@@ -24,7 +24,8 @@ export async function submitCreateAgent(companyName: string, payload: CreateAgen
 }
 
 export async function submitUpdateAgent(companyName: string, agent: Partial<AgentWorker>): Promise<void> {
-  await updateAgents(companyName, [agent]);
+  if (!agent.name) throw new Error('Agent name is required for update');
+  await updateAgent(companyName, agent.name, agent);
 }
 
 export async function loadOrgChart(companyName: string): Promise<OrgChartNode[]> {

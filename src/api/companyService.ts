@@ -179,6 +179,17 @@ export async function createAgent(
   return mapAgent(raw);
 }
 
+export async function updateAgent(
+  companyName: string,
+  agentName: string,
+  updates: Partial<AgentWorker>
+): Promise<void> {
+  await put<unknown>(
+    `/companies/${encodeURIComponent(companyName)}/agents/${encodeURIComponent(agentName)}`,
+    updates
+  );
+}
+
 export async function fetchOrgChart(companyName: string): Promise<OrgChartNode[]> {
   const response = await get<unknown>(`/companies/${encodeURIComponent(companyName)}/org-chart`);
   const raw = extractKey<BackendOrgNode[]>(response, 'org_chart');
