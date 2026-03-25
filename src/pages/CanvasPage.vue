@@ -403,6 +403,22 @@ async function onConnect(connection: Connection) {
   const company = activeCompany.value?.name;
   if (!company) return;
 
+  // Prevent cycles: check if supervisorName is a descendant of agentName
+  const wouldCycle = (agent: string, visited = new Set<string>()): boolean => {
+    if (visited.has(agent)) return true;
+    visited.add(agent);
+    // Check current edges for who this agent supervises
+    const subordinates = (edges.value as any[])
+      .filter((e: any) => e.source === `agent-${agent}` && !e.id.includes('task'))
+      .map((e: any) => e.target.replace('agent-', ''));
+    return subordinates.some(sub => sub === agentName || wouldCycle(sub, visited));
+  };
+
+  if (agentName === supervisorName || wouldCycle(supervisorName)) {
+    console.warn('[Canvas] Cycle detected — cannot make', agentName, 'report to', supervisorName);
+    return;
+  }
+
   // Save to localStorage (instant, survives F5)
   saveOverride(agentName, supervisorName);
 

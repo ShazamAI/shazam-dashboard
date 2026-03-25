@@ -3,10 +3,14 @@ import SidebarNav from '@/components/layouts/SidebarNav.vue';
 import MobileSidebar from '@/components/layouts/MobileSidebar.vue';
 import TopHeader from '@/components/layouts/TopHeader.vue';
 import ToastContainer from '@/components/common/ToastContainer.vue';
+import CircuitBreakerAlert from '@/components/common/CircuitBreakerAlert.vue';
 </script>
 
 <template>
   <div class="flex h-screen overflow-hidden bg-surface">
+    <!-- Circuit Breaker Alert (top bar) -->
+    <CircuitBreakerAlert />
+
     <!-- Desktop sidebar -->
     <SidebarNav />
     <!-- Mobile sidebar (overlay) -->
