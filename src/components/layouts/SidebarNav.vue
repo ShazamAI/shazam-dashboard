@@ -59,7 +59,7 @@ const iconMap: Record<string, string> = {
       <Transition name="brand-text">
         <div v-if="!isCollapsed" class="flex items-center gap-1.5 overflow-hidden flex-1">
           <span class="text-lg font-bold tracking-tight text-white truncate">{{ projectName }}</span>
-          <svg v-if="companies.length > 1" class="h-3 w-3 text-gray-500 shrink-0 transition-transform" :class="showProjectDropdown ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+          <svg v-if="companies.length > 0" class="h-3 w-3 text-gray-500 shrink-0 transition-transform" :class="showProjectDropdown ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
         </div>
@@ -68,7 +68,7 @@ const iconMap: Record<string, string> = {
       <!-- Project dropdown -->
       <Transition name="tooltip">
         <div
-          v-if="showProjectDropdown && !isCollapsed && companies.length > 1"
+          v-if="showProjectDropdown && !isCollapsed && companies.length > 0"
           class="absolute left-2 right-2 top-full z-50 mt-1 rounded-xl border border-gray-700 bg-gray-800 py-1 shadow-elevation-3"
         >
           <button
