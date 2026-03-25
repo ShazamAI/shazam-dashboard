@@ -1,0 +1,87 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact: Shazam Dashboard_*_aarch64.dmg
+            name: shazam-dashboard-macos-arm64.dmg
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact: Shazam Dashboard_*_x64.dmg
+            name: shazam-dashboard-macos-x86_64.dmg
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            artifact: shazam-dashboard_*_amd64.deb
+            name: shazam-dashboard-linux-x86_64.deb
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: Shazam Dashboard_*_x64-setup.exe
+            name: shazam-dashboard-windows-x86_64-setup.exe
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: ${{ github.ref_name }}
+          releaseBody: |
+            ## Shazam Dashboard ${{ github.ref_name }}
+
+            Native desktop app for the Shazam AI Agent Orchestrator.
+
+            ### Downloads
+
+            | Platform | File |
+            |---|---|
+            | macOS (Apple Silicon) | `shazam-dashboard-macos-arm64.dmg` |
+            | macOS (Intel) | `shazam-dashboard-macos-x86_64.dmg` |
+            | Linux (x86_64) | `shazam-dashboard-linux-x86_64.deb` |
+            | Windows (x86_64) | `shazam-dashboard-windows-x86_64-setup.exe` |
+
+            ### Install
+            - **macOS**: Open DMG, drag to Applications
+            - **Linux**: `sudo dpkg -i shazam-dashboard-linux-x86_64.deb`
+            - **Windows**: Run the installer
+
+            ### Requirements
+            - Shazam daemon running: `shazam daemon start`
+          releaseDraft: false
+          prerelease: false
+          args: --target ${{ matrix.target }}
