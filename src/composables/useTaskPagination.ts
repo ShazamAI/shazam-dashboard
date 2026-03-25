@@ -1,5 +1,6 @@
 import { ref, computed, watch, onUnmounted } from 'vue';
 import { fetchTasks } from '@/api/taskService';
+import { useActiveCompany } from '@/composables/useActiveCompany';
 import type { Task, TaskStatus, TaskFilter } from '@/types';
 
 // ─── Constants ──────────────────────────────────────────
@@ -110,10 +111,12 @@ export function useTaskPagination() {
     }
 
     try {
+      const { activeCompany } = useActiveCompany();
       const filters: TaskFilter = {
         page: targetPage,
         page_size: pageSize.value,
       };
+      if (activeCompany.value?.name) filters.company = activeCompany.value.name;
       if (statusFilter.value) filters.status = statusFilter.value;
       if (agentFilter.value) filters.assigned_to = agentFilter.value;
 

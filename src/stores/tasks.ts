@@ -72,12 +72,13 @@ export const useTaskStore = defineStore('tasks', () => {
 
   // ─── Actions ────────────────────────────────────────
 
-  async function load(opts: { silent?: boolean; page?: number } = {}): Promise<void> {
+  async function load(opts: { silent?: boolean; page?: number; company?: string } = {}): Promise<void> {
     const targetPage = opts.page ?? currentPage.value;
     if (!opts.silent) isLoading.value = true;
 
     try {
       const filters: TaskFilter = { page: targetPage, page_size: pageSize.value };
+      if (opts.company) filters.company = opts.company;
       if (statusFilter.value) filters.status = statusFilter.value;
       if (agentFilter.value) filters.assigned_to = agentFilter.value;
 

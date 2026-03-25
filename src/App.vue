@@ -37,7 +37,7 @@ watch(
 
       // Reload stores for the new project context
       await Promise.allSettled([
-        taskStore.load(),
+        taskStore.load({ company: name }),
         agentStore.load(name),
       ]);
     }
