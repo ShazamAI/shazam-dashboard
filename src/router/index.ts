@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import type { RouteRecordRaw } from 'vue-router';
+import { useActiveCompany } from '@/composables/useActiveCompany';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -57,10 +58,11 @@ const router = createRouter({
   routes,
 });
 
-// Update document title on route change
+// Update document title on route change — uses the active project name dynamically
 router.afterEach((to) => {
-  const title = (to.meta?.title as string) ?? 'Shazam';
-  document.title = `${title} — Shazam Dashboard`;
+  const { projectName } = useActiveCompany();
+  const title = (to.meta?.title as string) ?? 'Dashboard';
+  document.title = `${title} — ${projectName.value}`;
 });
 
 export default router;

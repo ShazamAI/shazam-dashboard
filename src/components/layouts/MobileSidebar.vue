@@ -3,9 +3,11 @@ import { computed, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { routes } from '@/router';
 import { useSidebar } from '@/composables/useSidebar';
+import { useActiveCompany } from '@/composables/useActiveCompany';
 
 const route = useRoute();
 const { isMobileOpen, closeMobile } = useSidebar();
+const { projectName } = useActiveCompany();
 
 const navItems = computed(() =>
   routes
@@ -73,11 +75,10 @@ onUnmounted(() => document.removeEventListener('keydown', handleKeydown));
         <div class="flex h-16 items-center justify-between border-b border-gray-800/50 px-4">
           <div class="flex items-center gap-2.5">
             <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-gradient text-sm font-bold text-gray-950 shadow-glow-sm">
-              S
+              {{ projectName.charAt(0) }}
             </div>
             <div class="flex items-baseline gap-1.5">
-              <span class="text-lg font-bold tracking-tight text-white">Shazam</span>
-              <span class="text-[10px] font-medium text-shazam-500">.dev</span>
+              <span class="text-lg font-bold tracking-tight text-white">{{ projectName }}</span>
             </div>
           </div>
           <button
@@ -127,7 +128,7 @@ onUnmounted(() => document.removeEventListener('keydown', handleKeydown));
 
         <!-- Footer -->
         <div class="border-t border-gray-800/50 px-4 py-3">
-          <p class="text-[10px] text-gray-700">Shazam Dashboard v0.1.0</p>
+          <p class="text-[10px] text-gray-700">{{ projectName }} v0.1.0</p>
         </div>
       </aside>
     </Transition>

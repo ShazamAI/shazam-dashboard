@@ -1,17 +1,13 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted, watch } from 'vue';
 import AppLayout from '@/components/layouts/AppLayout.vue';
 import { useActiveCompany } from '@/composables/useActiveCompany';
 import { useWebSocket } from '@/composables/useWebSocket';
 
-const { loadCompanies } = useActiveCompany();
+const { loadCompanies, activeCompany } = useActiveCompany();
 const ws = useWebSocket();
 
 // ─── Auto-load & keep company state fresh ─────────────────
-// 1. Load on startup (immediate)
-// 2. Poll every 30s as fallback for backend changes
-// 3. Listen for WebSocket events that signal company changes
-
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 const COMPANY_EVENTS = new Set([
@@ -27,6 +23,17 @@ ws.on('*', (event) => {
     loadCompanies();
   }
 });
+
+// Subscribe to active project when it changes
+watch(
+  () => activeCompany.value?.name,
+  (name) => {
+    if (name) {
+      ws.subscribeToProject(name);
+    }
+  },
+  { immediate: true }
+);
 
 onMounted(() => {
   loadCompanies();

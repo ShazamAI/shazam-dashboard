@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { useConfigForm } from '@/composables/useConfigForm';
 import { useWorkspaces } from '@/composables/useWorkspaces';
+import { useActiveCompany } from '@/composables/useActiveCompany';
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue';
 import ErrorBoundary from '@/components/common/ErrorBoundary.vue';
 import EmptyState from '@/components/common/EmptyState.vue';
@@ -24,6 +25,8 @@ const {
   workspaces, isLoading: isLoadingWorkspaces, switchingTo,
   ensureLoaded: ensureWorkspacesLoaded, handleSwitchWorkspace,
 } = useWorkspaces();
+
+const { projectName } = useActiveCompany();
 
 type TabKey = 'general' | 'ralph' | 'agents' | 'plugins' | 'techstack' | 'workspaces';
 const activeTab = ref<TabKey>('general');
@@ -62,7 +65,7 @@ watch(activeTab, (tab) => {
       <EmptyState
         v-if="!error"
         title="No configuration available"
-        description="No active Shazam project detected. Ensure the backend is running."
+        description="No active project detected. Ensure the backend is running."
       />
       <div v-else class="flex flex-col items-center gap-4 rounded-2xl border border-gray-800 bg-surface-card px-6 py-16 text-center">
         <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/10 text-2xl">⚠️</div>
@@ -98,7 +101,7 @@ watch(activeTab, (tab) => {
         </div>
         <div>
           <h1 class="page-title">Configuration</h1>
-          <p class="page-subtitle">Manage your Shazam project settings</p>
+          <p class="page-subtitle">Manage your {{ projectName }} settings</p>
         </div>
       </div>
 

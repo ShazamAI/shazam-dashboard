@@ -1,11 +1,22 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { routes } from '@/router';
 import { useSidebar } from '@/composables/useSidebar';
+import { useActiveCompany } from '@/composables/useActiveCompany';
+import { useWebSocket } from '@/composables/useWebSocket';
 
 const route = useRoute();
 const { isCollapsed, toggle } = useSidebar();
+const { projectName, companies, activeCompany, selectCompany } = useActiveCompany();
+const ws = useWebSocket();
+const showProjectDropdown = ref(false);
+
+function switchProject(name: string) {
+  selectCompany(name);
+  ws.subscribeToProject(name);
+  showProjectDropdown.value = false;
+}
 
 const navItems = computed(() =>
   routes
@@ -36,18 +47,40 @@ const iconMap: Record<string, string> = {
     class="sidebar hidden flex-col border-r border-gray-800 bg-gray-900 transition-all duration-300 ease-bounce-in md:flex"
     :class="isCollapsed ? 'w-[68px]' : 'w-64'"
   >
-    <!-- Logo row -->
+    <!-- Logo row — project selector -->
     <div
-      class="flex h-16 shrink-0 items-center gap-2.5 border-b border-gray-800/50 px-4"
+      class="relative flex h-16 shrink-0 items-center gap-2.5 border-b border-gray-800/50 px-4 cursor-pointer hover:bg-gray-800/30 transition-colors"
       :class="isCollapsed ? 'justify-center px-2' : ''"
+      @click="showProjectDropdown = !showProjectDropdown"
     >
       <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-gradient text-sm font-bold text-gray-950 shadow-glow-sm transition-transform duration-300 hover:scale-105">
-        S
+        {{ projectName.charAt(0) }}
       </div>
       <Transition name="brand-text">
-        <div v-if="!isCollapsed" class="flex items-baseline gap-1.5 overflow-hidden">
-          <span class="text-lg font-bold tracking-tight text-white">Shazam</span>
-          <span class="text-[10px] font-medium text-shazam-500">.dev</span>
+        <div v-if="!isCollapsed" class="flex items-center gap-1.5 overflow-hidden flex-1">
+          <span class="text-lg font-bold tracking-tight text-white truncate">{{ projectName }}</span>
+          <svg v-if="companies.length > 1" class="h-3 w-3 text-gray-500 shrink-0 transition-transform" :class="showProjectDropdown ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </Transition>
+
+      <!-- Project dropdown -->
+      <Transition name="tooltip">
+        <div
+          v-if="showProjectDropdown && !isCollapsed && companies.length > 1"
+          class="absolute left-2 right-2 top-full z-50 mt-1 rounded-xl border border-gray-700 bg-gray-800 py-1 shadow-elevation-3"
+        >
+          <button
+            v-for="company in companies"
+            :key="company.name"
+            class="flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-gray-700/50"
+            :class="company.name === activeCompany?.name ? 'text-shazam-400' : 'text-gray-300'"
+            @click.stop="switchProject(company.name)"
+          >
+            <span class="h-2 w-2 rounded-full shrink-0" :class="company.status === 'active' ? 'bg-green-400' : 'bg-gray-600'" />
+            <span class="truncate">{{ company.name }}</span>
+          </button>
         </div>
       </Transition>
     </div>

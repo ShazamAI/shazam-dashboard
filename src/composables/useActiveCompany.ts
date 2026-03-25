@@ -7,18 +7,24 @@ const companies = ref<Company[]>([]);
 const isLoading = ref(false);
 const error = ref<string | null>(null);
 const initialized = ref(false);
+const selectedCompanyName = ref<string | null>(null);
 let loadPromise: Promise<Company[]> | null = null;
 
 // ─── Derived state ────────────────────────────────────────
-// Company is automatically resolved: backend-active first, then first available.
-// No manual selection — the dashboard always reflects the current Shazam project.
 const activeCompany = computed<Company | null>(() => {
+  // If user selected a company, use that
+  if (selectedCompanyName.value) {
+    const selected = companies.value.find((c) => c.name === selectedCompanyName.value);
+    if (selected) return selected;
+  }
+  // Fallback: backend-active first, then first available
   const backendActive = companies.value.find((c) => c.status === 'active');
   return backendActive ?? companies.value[0] ?? null;
 });
 
+const projectName = computed(() => activeCompany.value?.name ?? 'Dashboard');
+
 async function loadCompanies(): Promise<Company[]> {
-  // Deduplicate concurrent calls
   if (loadPromise) return loadPromise;
 
   isLoading.value = true;
@@ -27,12 +33,37 @@ async function loadCompanies(): Promise<Company[]> {
   loadPromise = fetchCompanies()
     .then((result) => {
       companies.value = Array.isArray(result) ? result : [];
-      initialized.value = true;
-      return companies.value;
+
+      // Also try health endpoint for daemon-managed companies
+      return fetchHealthCompanies().then((healthCompanies) => {
+        // Merge: add any companies from health that aren't in the list
+        for (const name of healthCompanies) {
+          if (!companies.value.find((c) => c.name === name)) {
+            companies.value.push({
+              name,
+              status: 'active',
+              agents: [],
+              mission: '',
+            } as unknown as Company);
+          }
+        }
+        initialized.value = true;
+        return companies.value;
+      });
     })
     .catch((err) => {
       error.value = err instanceof Error ? err.message : 'Failed to load companies';
-      return companies.value;
+      // Try health endpoint as fallback
+      return fetchHealthCompanies().then((healthCompanies) => {
+        companies.value = healthCompanies.map((name) => ({
+          name,
+          status: 'active',
+          agents: [],
+          mission: '',
+        } as unknown as Company));
+        initialized.value = true;
+        return companies.value;
+      }).catch(() => companies.value);
     })
     .finally(() => {
       isLoading.value = false;
@@ -42,14 +73,32 @@ async function loadCompanies(): Promise<Company[]> {
   return loadPromise;
 }
 
+async function fetchHealthCompanies(): Promise<string[]> {
+  try {
+    const res = await fetch('/api/health');
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.companies) ? data.companies : [];
+  } catch {
+    return [];
+  }
+}
+
+function selectCompany(name: string | null) {
+  selectedCompanyName.value = name;
+}
+
 // ─── Public composable ───────────────────────────────────
 export function useActiveCompany() {
   return {
     activeCompany,
+    projectName,
     companies: readonly(companies),
     isLoading: readonly(isLoading),
     error: readonly(error),
     initialized: readonly(initialized),
+    selectedCompanyName: readonly(selectedCompanyName),
     loadCompanies,
+    selectCompany,
   };
 }

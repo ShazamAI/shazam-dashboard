@@ -13,6 +13,7 @@ let socket: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let isDestroyed = false;
 let activeConsumers = 0;
+let subscribedCompany: string | null = null;
 
 const listeners = new Map<EventType | '*', Set<EventHandler>>();
 
@@ -132,6 +133,11 @@ function connect() {
     socket.onopen = () => {
       isConnected.value = true;
       reconnectAttempts.value = 0;
+
+      // Auto-subscribe to active project if set
+      if (subscribedCompany) {
+        send({ action: 'subscribe', company: subscribedCompany });
+      }
     };
 
     socket.onmessage = (messageEvent: MessageEvent) => {
@@ -239,5 +245,16 @@ export function useWebSocket() {
       connect();
     },
     disconnect,
+
+    /** Subscribe to a specific project — filters events server-side */
+    subscribeToProject(company: string) {
+      subscribedCompany = company;
+      send({ action: 'subscribe', company });
+    },
+
+    /** Send a command to the daemon (e.g. "/tasks", "/start") */
+    sendCommand(raw: string) {
+      send({ action: 'command', raw });
+    },
   };
 }
