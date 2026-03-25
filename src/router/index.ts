@@ -16,6 +16,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'Dashboard', icon: 'home' },
   },
   {
+    path: '/canvas',
+    name: 'Canvas',
+    component: () => import('@/pages/CanvasPage.vue'),
+    meta: { title: 'Canvas', icon: 'canvas' },
+  },
+  {
     path: '/tasks',
     name: 'Tasks',
     component: () => import('@/pages/TasksPage.vue'),
