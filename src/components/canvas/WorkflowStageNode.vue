@@ -14,7 +14,7 @@ interface Props {
   };
 }
 
-const props = defineProps<Props>();
+const { data } = defineProps<Props>();
 const emit = defineEmits<{
   update: [field: string, value: string];
   remove: [];
@@ -27,19 +27,19 @@ const roleColors: Record<string, { bg: string; border: string; text: string }> =
   default: { bg: 'bg-gray-800/60', border: 'border-gray-600', text: 'text-gray-400' },
 };
 
-function getColors(role: string) {
+function getColors(role: string): { bg: string; border: string; text: string } {
   const lower = role.toLowerCase();
   for (const [key, val] of Object.entries(roleColors)) {
     if (key !== 'default' && lower.includes(key)) return val;
   }
-  return roleColors.default;
+  return roleColors['default']!;
 }
 </script>
 
 <template>
   <div
     class="rounded-xl border-2 shadow-lg min-w-[180px] max-w-[220px] transition-all"
-    :class="[getColors(data.role).bg, getColors(data.role).border]"
+    :class="[getColors(data.role ?? '').bg, getColors(data.role ?? '').border]"
   >
     <Handle v-if="!data.isFirst" type="target" :position="Position.Left" class="!bg-gray-500 !w-2.5 !h-2.5 !border-2 !border-gray-900" />
 
@@ -75,7 +75,7 @@ function getColors(role: string) {
 
       <!-- Role -->
       <div class="flex items-center gap-1.5 mt-1">
-        <span class="h-1.5 w-1.5 rounded-full" :class="getColors(data.role).text.replace('text-', 'bg-')" />
+        <span class="h-1.5 w-1.5 rounded-full" :class="getColors(data.role ?? '').text.replace('text-', 'bg-')" />
         <template v-if="data.editing">
           <select
             :value="data.role"
@@ -90,7 +90,7 @@ function getColors(role: string) {
           </select>
         </template>
         <template v-else>
-          <span class="text-[10px]" :class="getColors(data.role).text">{{ data.role }}</span>
+          <span class="text-[10px]" :class="getColors(data.role ?? '').text">{{ data.role }}</span>
         </template>
       </div>
     </div>

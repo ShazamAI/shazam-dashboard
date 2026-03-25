@@ -1,4 +1,4 @@
-import { get, post, del } from './http';
+import { get, post, put, del } from './http';
 import { extractKey, ensureArray } from './utils';
 import type { Task, TaskFilter, CreateTaskPayload, PaginatedResult, Workflow, PipelineStage } from '@/types';
 
