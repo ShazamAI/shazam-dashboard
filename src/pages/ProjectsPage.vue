@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useActiveCompany } from '@/composables/useActiveCompany'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { get, post, del } from '@/api/http'
@@ -22,6 +23,7 @@ const newProjectPath = ref('')
 const addingProject = ref(false)
 const actionLoading = ref<string | null>(null)
 
+const router = useRouter()
 const { selectCompany } = useActiveCompany()
 const ws = useWebSocket()
 
@@ -60,6 +62,7 @@ async function startProject(name: string) {
     selectCompany(name)
     ws.subscribeToProject(name)
     await loadProjects()
+    router.push('/dashboard')
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to start'
   } finally {
@@ -92,6 +95,7 @@ async function removeProject(name: string) {
 function selectProject(name: string) {
   selectCompany(name)
   ws.subscribeToProject(name)
+  router.push('/dashboard')
 }
 
 function formatDate(iso: string | null): string {

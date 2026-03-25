@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { approveTask, rejectTask, pauseTask, resumeTask, retryTask, deleteTask } from '@/api/taskService';
 import { useActiveCompany } from '@/composables/useActiveCompany';
@@ -71,6 +71,16 @@ onMounted(() => {
   pagination.loadTasks().then(() => pagination.clearLoadingTimeout());
   loadCompanies();
 });
+
+// Reload tasks when active project changes
+watch(
+  () => activeCompany.value?.name,
+  (name, oldName) => {
+    if (name && name !== oldName) {
+      pagination.loadTasks({ page: 1 });
+    }
+  }
+);
 </script>
 
 <template>

@@ -1,4 +1,4 @@
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { fetchTasks } from '@/api/taskService';
 import { fetchRecentEvents } from '@/api/eventService';
 import { useWebSocket } from '@/composables/useWebSocket';
@@ -64,7 +64,8 @@ export function useDashboard() {
   // ─── Task refresh ────────────────────────────────────
   async function refreshTasks() {
     try {
-      const result = await fetchTasks();
+      const companyFilter = activeCompany.value?.name ? { company: activeCompany.value.name } : undefined;
+      const result = await fetchTasks(companyFilter);
       const extracted = extractTasks(result);
       if (extracted.length > 0 || tasks.value.length === 0) {
         tasks.value = extracted;
@@ -193,6 +194,14 @@ export function useDashboard() {
     if (taskPollTimer) clearInterval(taskPollTimer);
     if (loadingTimeoutTimer) clearTimeout(loadingTimeoutTimer);
     cleanupDebounce();
+  });
+
+  // Reload when active project changes
+  watch(() => activeCompany.value?.name, (name, oldName) => {
+    if (name && name !== oldName) {
+      refreshTasks();
+      refreshCompanies();
+    }
   });
 
   return {
