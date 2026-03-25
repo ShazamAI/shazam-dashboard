@@ -121,52 +121,101 @@ function normalizeEvent(raw: unknown): ShazamEvent | null {
   };
 }
 
-function connect() {
+async function connect() {
   if (isDestroyed) return;
-  if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) return;
 
-  // In Tauri (production), connect directly to daemon. In dev, use Vite proxy.
-  const isTauri = '__TAURI__' in window;
+  const isTauri = typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window);
   const url = isTauri ? 'ws://127.0.0.1:4040/ws' : `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`;
 
-  try {
-    socket = new WebSocket(url);
+  if (isTauri) {
+    // Use Tauri WebSocket plugin (bypasses WebKit mixed-content block)
+    try {
+      const TauriWebSocket = (await import('@tauri-apps/plugin-websocket')).default;
 
-    socket.onopen = () => {
+      if (socket) return; // Already connected
+
+      const tauriWs = await TauriWebSocket.connect(url);
       isConnected.value = true;
       reconnectAttempts.value = 0;
 
-      // Auto-subscribe to active project if set
+      // Subscribe if needed
       if (subscribedCompany) {
-        send({ action: 'subscribe', company: subscribedCompany });
+        tauriWs.send(JSON.stringify({ action: 'subscribe', company: subscribedCompany }));
       }
-    };
 
-    socket.onmessage = (messageEvent: MessageEvent) => {
-      try {
-        const parsed = JSON.parse(messageEvent.data as string) as unknown;
-        const normalized = normalizeEvent(parsed);
+      // Store a proxy object so send() works uniformly
+      socket = {
+        readyState: WebSocket.OPEN,
+        send: (data: string) => tauriWs.send(data),
+        close: () => tauriWs.disconnect(),
+        onclose: null,
+        onerror: null,
+        onmessage: null,
+        onopen: null,
+      } as unknown as WebSocket;
 
-        if (!normalized) return;
+      tauriWs.addListener((msg) => {
+        if (msg.type === 'Close') {
+          isConnected.value = false;
+          socket = null;
+          scheduleReconnect();
+          return;
+        }
+        if (msg.type !== 'Text' || typeof msg.data !== 'string') return;
 
-        lastEvent.value = normalized;
-        events.value = [...events.value.slice(-99), normalized];
-        emit(normalized);
-      } catch {
-        // Unparseable message — skip silently
-      }
-    };
-
-    socket.onclose = () => {
-      isConnected.value = false;
+        try {
+          const parsed = JSON.parse(msg.data) as unknown;
+          const normalized = normalizeEvent(parsed);
+          if (!normalized) return;
+          lastEvent.value = normalized;
+          events.value = [...events.value.slice(-99), normalized];
+          emit(normalized);
+        } catch {
+          // skip
+        }
+      });
+    } catch {
       scheduleReconnect();
-    };
+    }
+  } else {
+    // Browser native WebSocket (dev mode with Vite proxy)
+    if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) return;
 
-    socket.onerror = () => {
-      socket?.close();
-    };
-  } catch {
-    scheduleReconnect();
+    try {
+      socket = new WebSocket(url);
+
+      socket.onopen = () => {
+        isConnected.value = true;
+        reconnectAttempts.value = 0;
+        if (subscribedCompany) {
+          send({ action: 'subscribe', company: subscribedCompany });
+        }
+      };
+
+      socket.onmessage = (messageEvent: MessageEvent) => {
+        try {
+          const parsed = JSON.parse(messageEvent.data as string) as unknown;
+          const normalized = normalizeEvent(parsed);
+          if (!normalized) return;
+          lastEvent.value = normalized;
+          events.value = [...events.value.slice(-99), normalized];
+          emit(normalized);
+        } catch {
+          // skip
+        }
+      };
+
+      socket.onclose = () => {
+        isConnected.value = false;
+        scheduleReconnect();
+      };
+
+      socket.onerror = () => {
+        socket?.close();
+      };
+    } catch {
+      scheduleReconnect();
+    }
   }
 }
 

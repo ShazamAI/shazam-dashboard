@@ -3,11 +3,14 @@ import { onMounted, onUnmounted, watch } from 'vue';
 import AppLayout from '@/components/layouts/AppLayout.vue';
 import { useActiveCompany } from '@/composables/useActiveCompany';
 import { useWebSocket } from '@/composables/useWebSocket';
+import { useTaskStore } from '@/stores/tasks';
+import { useAgentStore } from '@/stores/agents';
 
 const { loadCompanies, activeCompany } = useActiveCompany();
 const ws = useWebSocket();
+const taskStore = useTaskStore();
+const agentStore = useAgentStore();
 
-// ─── Auto-load & keep company state fresh ─────────────────
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 const COMPANY_EVENTS = new Set([
@@ -24,12 +27,19 @@ ws.on('*', (event) => {
   }
 });
 
-// Subscribe to active project when it changes
+// When active project changes: re-subscribe + reload all data
 watch(
   () => activeCompany.value?.name,
-  (name) => {
-    if (name) {
+  async (name, oldName) => {
+    if (name && name !== oldName) {
+      // Subscribe to this project's events
       ws.subscribeToProject(name);
+
+      // Reload stores for the new project context
+      await Promise.allSettled([
+        taskStore.load(),
+        agentStore.load(name),
+      ]);
     }
   },
   { immediate: true }

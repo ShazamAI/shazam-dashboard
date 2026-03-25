@@ -75,11 +75,8 @@ async function loadCompanies(): Promise<Company[]> {
 
 async function fetchHealthCompanies(): Promise<string[]> {
   try {
-    const isTauri = '__TAURI__' in window;
-    const base = isTauri ? 'http://127.0.0.1:4040' : '';
-    const res = await fetch(`${base}/api/health`);
-    if (!res.ok) return [];
-    const data = await res.json();
+    const { get } = await import('@/api/http');
+    const data = await get<{ companies?: string[] }>('/health');
     return Array.isArray(data.companies) ? data.companies : [];
   } catch {
     return [];

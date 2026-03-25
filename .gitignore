@@ -142,3 +142,6 @@ vite.config.ts.timestamp-*
 src-tauri/target/
 src-tauri/Cargo.lock
 *.DS_Store
+
+# Local Shazam project data (never commit)
+.shazam/

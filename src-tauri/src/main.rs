@@ -2,6 +2,8 @@
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_websocket::init())
+        .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_shell::init())
         .run(tauri::generate_context!())
         .expect("error while running Shazam Dashboard");

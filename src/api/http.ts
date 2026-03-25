@@ -1,6 +1,19 @@
-// In Tauri (production), connect directly to daemon. In dev, use Vite proxy.
-const isTauri = '__TAURI__' in window;
+// Detect Tauri environment
+const isTauri = typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window);
 const BASE_URL = isTauri ? 'http://127.0.0.1:4040/api' : '/api';
+
+// Eagerly load Tauri fetch plugin
+let tauriFetchReady: Promise<typeof globalThis.fetch> | null = null;
+if (isTauri) {
+  tauriFetchReady = import('@tauri-apps/plugin-http').then((mod) => mod.fetch as typeof globalThis.fetch);
+}
+
+async function getFetch(): Promise<typeof globalThis.fetch> {
+  if (tauriFetchReady) {
+    return tauriFetchReady;
+  }
+  return globalThis.fetch;
+}
 
 interface RequestOptions {
   method?: string;
@@ -24,12 +37,12 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     config.body = JSON.stringify(body);
   }
 
-  const response = await fetch(fullUrl, config);
+  const fetchFn = await getFetch();
+  const response = await fetchFn(fullUrl, config);
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => 'Unknown error');
 
-    // Try to extract error message from JSON response
     try {
       const errorJson = JSON.parse(errorText) as Record<string, unknown>;
       if (typeof errorJson.error === 'string') {
