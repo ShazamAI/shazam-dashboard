@@ -5,6 +5,12 @@ import { useActiveCompany } from '@/composables/useActiveCompany';
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
+    name: 'Projects',
+    component: () => import('@/pages/ProjectsPage.vue'),
+    meta: { title: 'Projects', icon: 'projects' },
+  },
+  {
+    path: '/dashboard',
     name: 'Dashboard',
     component: () => import('@/pages/DashboardPage.vue'),
     meta: { title: 'Dashboard', icon: 'home' },
