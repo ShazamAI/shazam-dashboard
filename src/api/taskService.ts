@@ -136,6 +136,12 @@ export async function retryTask(taskId: string): Promise<Task> {
   return mapTask(raw);
 }
 
+export async function updateTask(taskId: string, updates: { title?: string; description?: string; assigned_to?: string }): Promise<Task> {
+  const response = await put<unknown>(`/tasks/${encodeURIComponent(taskId)}`, updates);
+  const raw = extractKey<BackendTask>(response, 'task');
+  return mapTask(raw);
+}
+
 export async function deleteTask(taskId: string): Promise<void> {
   await del<unknown>(`/tasks/${encodeURIComponent(taskId)}`);
 }

@@ -7,8 +7,10 @@ import EventFeed from '@/components/features/EventFeed.vue';
 import TaskOverview from '@/components/features/TaskOverview.vue';
 import AgentList from '@/components/features/AgentList.vue';
 import RecentTasks from '@/components/features/RecentTasks.vue';
+import TaskDetailPanel from '@/components/features/TaskDetailPanel.vue';
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue';
 import { get, post } from '@/api/http';
+import type { Task } from '@/types';
 
 const router = useRouter();
 
@@ -29,6 +31,23 @@ function navigateToTasks() {
 
 function filterByStatus(status: string) {
   router.push({ name: 'Tasks', query: { status } });
+}
+
+// ─── Task Detail Panel ──────────────────────────────
+const selectedTask = ref<Task | null>(null);
+const dashboardActionLoading = ref<Record<string, string>>({});
+
+function selectTask(task: Task) {
+  selectedTask.value = task;
+}
+
+function closeDashboardDetail() {
+  selectedTask.value = null;
+}
+
+function handleDashboardTaskAction(taskId: string, action: string) {
+  // Navigate to tasks page for full action handling
+  router.push({ name: 'Tasks', query: { task: taskId, action } });
 }
 
 // ─── Health Indicators ──────────────────────────────
@@ -402,6 +421,7 @@ onMounted(() => {
             :tasks="recentTasks"
             @view-all="navigateToTasks"
             @filter-by-status="filterByStatus"
+            @select-task="selectTask"
           />
 
           <!-- ============================================= -->
@@ -452,6 +472,26 @@ onMounted(() => {
         </div>
       </div>
     </template>
+
+    <!-- Task Detail Panel (overlay) -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition-opacity duration-200"
+        enter-from-class="opacity-0"
+        leave-active-class="transition-opacity duration-200"
+        leave-to-class="opacity-0"
+      >
+        <div v-if="selectedTask" class="fixed inset-0 z-50 flex items-start justify-end bg-black/40 p-4 pt-16" @click.self="closeDashboardDetail">
+          <TaskDetailPanel
+            :task="selectedTask"
+            :action-loading="dashboardActionLoading"
+            @close="closeDashboardDetail"
+            @navigate-agent="navigateToAgent"
+            @action="handleDashboardTaskAction"
+          />
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 

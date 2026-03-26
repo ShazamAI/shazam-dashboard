@@ -11,6 +11,7 @@ defineProps<Props>();
 const emit = defineEmits<{
   viewAll: [];
   filterByStatus: [status: string];
+  selectTask: [task: Task];
 }>();
 
 function formatAgent(task: Task): string {
@@ -63,7 +64,7 @@ function statusDotClass(status: string): string {
       >
         <button
           class="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-all duration-200 hover:bg-gray-800/30"
-          @click="emit('filterByStatus', task.status)"
+          @click="emit('selectTask', task)"
         >
           <!-- Timeline dot + line -->
           <div class="relative flex shrink-0 flex-col items-center self-stretch">

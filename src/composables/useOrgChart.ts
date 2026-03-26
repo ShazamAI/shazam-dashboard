@@ -3,7 +3,7 @@ import { useRouter } from 'vue-router';
 import { useActiveCompany } from './useActiveCompany';
 import { useWebSocket } from './useWebSocket';
 import { useAsyncState } from './useAsyncState';
-import { loadOrgChart, updateNodeStatuses } from '@/api/agentService';
+import { loadOrgChart, updateNodeStatuses, normalizeAgentStatus } from '@/api/agentService';
 import { normalizeError } from '@/api/utils';
 import type { OrgChartNode, AgentStatus } from '@/types';
 
@@ -48,9 +48,9 @@ export function useOrgChart() {
     if (event.type === 'agent_status_change') {
       const data = event.data as Record<string, unknown> | null;
       const agentName = (event.agent ?? data?.agent ?? data?.agent_name) as string | undefined;
-      const newStatus = (data?.to ?? data?.status) as string | undefined;
-      if (agentName && newStatus) {
-        updateNodeStatuses(orgChart.value, agentName, newStatus as AgentStatus);
+      const rawStatus = (data?.to ?? data?.status) as string | undefined;
+      if (agentName && rawStatus) {
+        updateNodeStatuses(orgChart.value, agentName, normalizeAgentStatus(rawStatus));
       }
       return;
     }
@@ -61,12 +61,14 @@ export function useOrgChart() {
       const agentName = (data?.assigned_to ?? event.agent) as string | undefined;
       if (!agentName) return;
 
-      const toStatus = data?.to as string | undefined;
-      let newStatus: AgentStatus = 'idle';
-      if (event.type === 'task_started' || toStatus === 'in_progress') {
+      let newStatus: AgentStatus;
+      if (event.type === 'task_started') {
         newStatus = 'busy';
-      } else if (toStatus === 'paused') {
-        newStatus = 'paused';
+      } else if (event.type === 'task_completed' || event.type === 'task_failed') {
+        newStatus = 'idle';
+      } else {
+        const toStatus = data?.to as string | undefined;
+        newStatus = toStatus ? normalizeAgentStatus(toStatus) : 'idle';
       }
       updateNodeStatuses(orgChart.value, agentName, newStatus);
     }

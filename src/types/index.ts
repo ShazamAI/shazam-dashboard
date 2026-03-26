@@ -368,3 +368,30 @@ export interface SystemHealth {
   max_concurrent: number;
   uptime_seconds: number;
 }
+
+// ===== Plan Types =====
+export interface PlanTask {
+  title: string;
+  assigned_to: string;
+  depends_on: string | null;
+  description: string;
+  phase?: string;
+  phase_goal?: string;
+}
+
+export interface Plan {
+  id: string;
+  title: string;
+  summary?: string;
+  status: 'draft' | 'active' | 'completed';
+  created_at: string;
+  tasks: PlanTask[];
+  architecture?: {
+    files_created?: string[];
+    files_modified?: string[];
+    interactions?: string;
+    decisions?: { decision: string; reason: string }[];
+    dependencies?: string[];
+  };
+  risks?: { risk: string; mitigation: string }[];
+}

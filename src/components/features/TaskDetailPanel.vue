@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import StatusBadge from '@/components/common/StatusBadge.vue';
 import AppButton from '@/components/common/Button.vue';
 import PipelineSteps from '@/components/features/PipelineSteps.vue';
+import { updateTask } from '@/api/taskService';
 import type { Task } from '@/types';
 
 interface Props {
@@ -20,7 +21,46 @@ const emit = defineEmits<{
   close: [];
   navigateAgent: [name: string];
   action: [taskId: string, action: string];
+  updated: [task: Task];
 }>();
+
+// ─── Edit Mode ──────────────────────────────
+const isEditing = ref(false);
+const editTitle = ref('');
+const editDescription = ref('');
+const editSaving = ref(false);
+
+watch(() => props.task, (t) => {
+  editTitle.value = t.title;
+  editDescription.value = t.description ?? '';
+  isEditing.value = false;
+}, { immediate: true });
+
+function startEditing() {
+  editTitle.value = props.task.title;
+  editDescription.value = props.task.description ?? '';
+  isEditing.value = true;
+}
+
+function cancelEditing() {
+  isEditing.value = false;
+}
+
+async function saveEdits() {
+  editSaving.value = true;
+  try {
+    const updated = await updateTask(props.task.id, {
+      title: editTitle.value,
+      description: editDescription.value,
+    });
+    emit('updated', updated);
+    isEditing.value = false;
+  } catch (e) {
+    console.error('Failed to update task:', e);
+  } finally {
+    editSaving.value = false;
+  }
+}
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleString(undefined, {
@@ -52,7 +92,12 @@ function hasAnyBusy(taskId: string): boolean {
           <StatusBadge :status="task.status" />
           <span class="font-mono text-[10px] text-gray-600">{{ task.id }}</span>
         </div>
-        <h2 class="section-title leading-snug">{{ task.title }}</h2>
+        <input
+          v-if="isEditing"
+          v-model="editTitle"
+          class="section-title w-full rounded border border-gray-700 bg-gray-900 px-2 py-1 leading-snug text-white focus:border-shazam-500 focus:outline-none"
+        />
+        <h2 v-else class="section-title leading-snug">{{ task.title }}</h2>
       </div>
       <button
         class="ml-3 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-800 hover:text-white"
@@ -108,9 +153,15 @@ function hasAnyBusy(taskId: string): boolean {
       </div>
 
       <!-- Description -->
-      <div v-if="task.description" class="border-b border-gray-800 px-3 py-3 sm:px-5 sm:py-4">
+      <div v-if="task.description || isEditing" class="border-b border-gray-800 px-3 py-3 sm:px-5 sm:py-4">
         <p class="micro-label mb-2">Description</p>
-        <p class="whitespace-pre-wrap text-xs leading-relaxed text-gray-300">{{ task.description }}</p>
+        <textarea
+          v-if="isEditing"
+          v-model="editDescription"
+          rows="4"
+          class="w-full rounded border border-gray-700 bg-gray-900 px-2 py-1 text-xs leading-relaxed text-gray-300 focus:border-shazam-500 focus:outline-none"
+        />
+        <p v-else class="whitespace-pre-wrap text-xs leading-relaxed text-gray-300">{{ task.description }}</p>
       </div>
 
       <!-- Result -->
@@ -139,6 +190,21 @@ function hasAnyBusy(taskId: string): boolean {
         </AppButton>
         <AppButton v-if="task.status === 'failed'" variant="warning" size="sm" :disabled="isBusy(task.id, 'retry')" :loading="isBusy(task.id, 'retry')" @click="emit('action', task.id, 'retry')">
           Retry
+        </AppButton>
+        <!-- Edit / Save / Cancel -->
+        <template v-if="isEditing">
+          <AppButton variant="primary" size="sm" :loading="editSaving" :disabled="editSaving" @click="saveEdits">
+            Save
+          </AppButton>
+          <AppButton variant="ghost" size="sm" :disabled="editSaving" @click="cancelEditing">
+            Cancel
+          </AppButton>
+        </template>
+        <AppButton v-else variant="ghost" size="sm" @click="startEditing">
+          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+          </svg>
+          Edit
         </AppButton>
         <div class="flex-1" />
         <AppButton variant="ghost" size="sm" :disabled="hasAnyBusy(task.id)" :loading="isBusy(task.id, 'delete')" @click="emit('action', task.id, 'delete')">

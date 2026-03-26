@@ -46,6 +46,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'Workflows', icon: 'workflows' },
   },
   {
+    path: '/plans',
+    name: 'Plans',
+    component: () => import('@/pages/PlansPage.vue'),
+    meta: { title: 'Plans', icon: 'plans' },
+  },
+  {
     path: '/config',
     name: 'Config',
     component: () => import('@/pages/ConfigPage.vue'),
