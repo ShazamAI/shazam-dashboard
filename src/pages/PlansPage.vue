@@ -392,16 +392,20 @@ onMounted(load);
 
         <!-- Scrollable content -->
         <div class="flex-1 overflow-y-auto px-6 py-5 space-y-6 scrollbar-thin">
-          <!-- Summary -->
-          <div v-if="selectedPlan.summary || isEditing">
-            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Summary</h3>
+          <!-- Summary / Description -->
+          <div>
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Description</h3>
             <textarea
               v-if="isEditing"
               v-model="editSummary"
-              class="w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-300 focus:border-shazam-500/50 focus:outline-none resize-none"
-              rows="3"
+              class="w-full rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 text-sm text-gray-300 font-mono leading-relaxed focus:border-shazam-500/50 focus:outline-none resize-y min-h-[120px]"
+              rows="8"
+              placeholder="Describe the plan in detail... Supports markdown formatting."
             />
-            <p v-else class="text-sm text-gray-300 leading-relaxed">{{ selectedPlan.summary }}</p>
+            <div v-else-if="selectedPlan.summary" class="rounded-lg border border-gray-800 bg-gray-900/50 px-4 py-3">
+              <pre class="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap font-sans">{{ selectedPlan.summary }}</pre>
+            </div>
+            <p v-else class="text-xs text-gray-600 italic">No description yet. Click Edit to add one.</p>
           </div>
 
           <!-- Meta info -->
