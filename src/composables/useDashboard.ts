@@ -1,19 +1,18 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { fetchTasks } from '@/api/taskService';
+import { fetchTasks, createTask } from '@/api/taskService';
 import { fetchRecentEvents } from '@/api/eventService';
+import { fetchAgents } from '@/api/companyService';
+import { computeTotalCost } from '@/api/metricsService';
 import { useWebSocket } from '@/composables/useWebSocket';
 import { useEventFeed } from '@/composables/useEventFeed';
 import { useActiveCompany } from '@/composables/useActiveCompany';
 import { useToast } from '@/composables/useToast';
-import { useDebouncedRefresh, LOAD_TIMEOUT_MS, POLL_INTERVAL_MS } from '@/composables/useAsyncState';
+import { LOAD_TIMEOUT_MS, POLL_INTERVAL_MS } from '@/composables/useAsyncState';
+import { taskRefreshTick, agentRefreshTick } from '@/composables/useRealtimeSync';
 import { ensureArray, normalizeError } from '@/api/utils';
 import { post } from '@/api/http';
-import type { Task, ShazamEvent, PaginatedResult } from '@/types';
-
-/** Task event types that trigger a data refresh */
-const TASK_EVENTS = new Set([
-  'task_status_change', 'task_completed', 'task_started', 'task_failed', 'task_created',
-]);
+import { registerSpotlightAction } from '@/composables/useSpotlight';
+import type { Task, AgentWorker, ShazamEvent, PaginatedResult, CreateTaskPayload } from '@/types';
 
 /** Extract Task[] from fetchTasks result (PaginatedResult or raw array) */
 function extractTasks(result: PaginatedResult<Task> | unknown): Task[] {
@@ -39,21 +38,140 @@ export function useDashboard() {
   const isLoading = ref(true);
   const hasError = ref(false);
   const tasks = ref<Task[]>([]);
+  const agents = ref<AgentWorker[]>([]);
   const isPaused = ref(false);
+
+  // ─── Create Task ───────────────────────────────────────
+  const showCreateTask = ref(false);
+  const isCreatingTask = ref(false);
+  const createTaskForm = ref<CreateTaskPayload>({
+    title: '',
+    description: '',
+    assigned_to: '',
+    workflow: '',
+  });
+  const complexityWarning = ref<{ reasons: string[]; estimated: number } | null>(null);
+
+  function openCreateTask() {
+    createTaskForm.value = {
+      title: '',
+      description: '',
+      assigned_to: '',
+      workflow: '',
+    };
+    complexityWarning.value = null;
+    showCreateTask.value = true;
+  }
+
+  function closeCreateTask() {
+    showCreateTask.value = false;
+    complexityWarning.value = null;
+  }
+
+  async function analyzeTaskComplexity(): Promise<boolean> {
+    if (!createTaskForm.value.title.trim()) return false;
+    try {
+      const result = await post<{ should_decompose: boolean; reasons?: string[]; estimated_subtasks?: number }>('/tasks/analyze', createTaskForm.value);
+      if (result.should_decompose) {
+        complexityWarning.value = {
+          reasons: result.reasons || [],
+          estimated: result.estimated_subtasks || 3,
+        };
+        return true;
+      } else {
+        complexityWarning.value = null;
+        return false;
+      }
+    } catch {
+      complexityWarning.value = null;
+      return false;
+    }
+  }
+
+  async function handleCreateTask() {
+    const companyName = activeCompany.value?.name;
+    if (!createTaskForm.value.title.trim() || !companyName) return;
+
+    // If no warning is shown yet, analyze complexity first
+    if (!complexityWarning.value) {
+      isCreatingTask.value = true;
+      try {
+        const shouldDecompose = await analyzeTaskComplexity();
+        if (shouldDecompose) {
+          // Show warning, don't create yet
+          return;
+        }
+      } finally {
+        isCreatingTask.value = false;
+      }
+    }
+
+    // Create normally (user chose "Create Anyway" or task is simple)
+    await forceCreateTask();
+  }
+
+  async function forceCreateTask() {
+    const companyName = activeCompany.value?.name;
+    if (!createTaskForm.value.title.trim() || !companyName) return;
+    isCreatingTask.value = true;
+    try {
+      await createTask(companyName, createTaskForm.value);
+      closeCreateTask();
+      await refreshTasks();
+      toast.success('Task created');
+    } catch (err) {
+      toast.error(normalizeError(err, 'Failed to create task'));
+    } finally {
+      isCreatingTask.value = false;
+    }
+  }
+
+  async function createWithDecomposition() {
+    const companyName = activeCompany.value?.name;
+    if (!createTaskForm.value.title.trim() || !companyName) return;
+
+    // Find a PM agent to assign to, or leave unassigned for the PM to pick up
+    const pmAgent = agents.value.find(
+      (a) => a.role?.toLowerCase().includes('manager') || a.role?.toLowerCase().includes('pm'),
+    );
+
+    isCreatingTask.value = true;
+    try {
+      const payload: CreateTaskPayload = {
+        ...createTaskForm.value,
+        assigned_to: pmAgent?.name || createTaskForm.value.assigned_to || '',
+      };
+      await createTask(companyName, payload);
+      closeCreateTask();
+      await refreshTasks();
+      toast.success('Task sent to PM for decomposition');
+    } catch (err) {
+      toast.error(normalizeError(err, 'Failed to create task'));
+    } finally {
+      isCreatingTask.value = false;
+    }
+  }
 
   // ─── Derived ──────────────────────────────────────────
   const totalTokens = computed(() =>
-    activeCompany.value?.agents.reduce((sum, a) => sum + a.tokens_used, 0) ?? 0,
+    agents.value.reduce((sum, a) => sum + a.tokens_used, 0),
   );
 
-  const taskStats = computed(() => ({
-    pending: tasks.value.filter((t) => t.status === 'pending').length,
-    running: tasks.value.filter((t) => t.status === 'in_progress').length,
-    done: tasks.value.filter((t) => t.status === 'completed').length,
-    failed: tasks.value.filter((t) => t.status === 'failed').length,
-    awaiting: tasks.value.filter((t) => t.status === 'awaiting_approval').length,
-    total: tasks.value.length,
-  }));
+  const totalCost = computed(() => computeTotalCost(totalTokens.value, agents.value));
+
+  const taskStats = computed(() => {
+    let pending = 0, running = 0, done = 0, failed = 0, awaiting = 0;
+    for (const t of tasks.value) {
+      switch (t.status) {
+        case 'pending': pending++; break;
+        case 'in_progress': running++; break;
+        case 'completed': done++; break;
+        case 'failed': failed++; break;
+        case 'awaiting_approval': awaiting++; break;
+      }
+    }
+    return { pending, running, done, failed, awaiting, total: tasks.value.length };
+  });
 
   const recentTasks = computed(() =>
     [...tasks.value]
@@ -62,7 +180,11 @@ export function useDashboard() {
   );
 
   // ─── Task refresh ────────────────────────────────────
+  let refreshTasksInFlight = false;
+
   async function refreshTasks() {
+    if (refreshTasksInFlight) return;
+    refreshTasksInFlight = true;
     try {
       const companyFilter = activeCompany.value?.name ? { company: activeCompany.value.name } : undefined;
       const result = await fetchTasks(companyFilter);
@@ -70,25 +192,30 @@ export function useDashboard() {
       if (extracted.length > 0 || tasks.value.length === 0) {
         tasks.value = extracted;
       }
-    } catch {
-      // Silent — keep existing data
+    } catch (err) {
+      console.warn('[useDashboard] refreshTasks failed, keeping existing data:', err);
+    } finally {
+      refreshTasksInFlight = false;
     }
   }
 
-  const [debouncedRefreshTasks, cleanupDebounce] = useDebouncedRefresh(() => refreshTasks());
-
   async function refreshCompanies() {
-    try { await loadCompanies(); } catch { /* silent */ }
+    try { await loadCompanies(); } catch (err) { console.warn('[useDashboard] refreshCompanies failed:', err); }
+  }
+
+  async function refreshAgents() {
+    if (!activeCompany.value?.name) return;
+    try {
+      agents.value = await fetchAgents(activeCompany.value.name);
+    } catch (err) {
+      console.warn('[useDashboard] refreshAgents failed:', err);
+    }
   }
 
   // ─── WebSocket event routing ─────────────────────────
+  // NOTE: Task/agent refresh and event feed processing are handled globally
+  // by useRealtimeSync. This listener only handles dashboard-specific events.
   ws.on('*', (event) => {
-    feed.processEvent(event);
-
-    if (TASK_EVENTS.has(event.type)) {
-      debouncedRefreshTasks();
-    }
-
     if (event.type === 'metrics_update') {
       const d = event.data as Record<string, unknown> | null;
       if (d && typeof d.total_tokens_used === 'number') {
@@ -165,6 +292,10 @@ export function useDashboard() {
   let taskPollTimer: ReturnType<typeof setInterval> | null = null;
   let loadingTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // Register spotlight actions
+  registerSpotlightAction('create-task', openCreateTask);
+  registerSpotlightAction('approve-all', handleApproveAll);
+
   onMounted(async () => {
     loadingTimeoutTimer = setTimeout(() => {
       if (isLoading.value) {
@@ -198,7 +329,8 @@ export function useDashboard() {
         toast.warning('Backend unreachable — showing cached data');
       }
 
-      feed.updateTotalCost(totalTokens.value);
+      // Load agents with tokens_used for accurate cost calculation
+      await refreshAgents();
     } catch (err) {
       hasError.value = true;
       toast.error(normalizeError(err, 'Failed to load dashboard'));
@@ -210,22 +342,22 @@ export function useDashboard() {
     taskPollTimer = setInterval(async () => {
       await refreshTasks();
       await refreshCompanies();
-      feed.updateTotalCost(totalTokens.value);
+      await refreshAgents();
     }, POLL_INTERVAL_MS);
   });
 
   onUnmounted(() => {
     if (taskPollTimer) clearInterval(taskPollTimer);
     if (loadingTimeoutTimer) clearTimeout(loadingTimeoutTimer);
-    cleanupDebounce();
   });
 
-  // Reload when active project changes
-  watch(() => activeCompany.value?.name, (name, oldName) => {
-    if (name && name !== oldName) {
-      refreshTasks();
-      refreshCompanies();
-    }
+  // React to useRealtimeSync signals (debounced by the global sync layer)
+  watch(taskRefreshTick, () => {
+    refreshTasks();
+  });
+
+  watch(agentRefreshTick, () => {
+    refreshAgents();
   });
 
   return {
@@ -235,12 +367,15 @@ export function useDashboard() {
     isPaused,
     tasks,
 
-    // Company
+    // Company & Agents
     activeCompany,
+    agents,
 
     // Derived
     taskStats,
     recentTasks,
+    totalCost,
+    totalTokens,
 
     // Feed & WS
     feed,
@@ -251,5 +386,18 @@ export function useDashboard() {
     handleStop,
     handleResume,
     handleApproveAll,
+
+    // Create Task
+    showCreateTask,
+    isCreatingTask,
+    createTaskForm,
+    openCreateTask,
+    closeCreateTask,
+    handleCreateTask,
+
+    // Complexity analysis
+    complexityWarning,
+    forceCreateTask,
+    createWithDecomposition,
   };
 }

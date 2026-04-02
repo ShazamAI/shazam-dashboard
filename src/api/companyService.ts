@@ -1,5 +1,6 @@
 import { get, post, put } from './http';
 import { extractKey, ensureArray } from './utils';
+import { validateString, validateNumber, validateAgentStatus } from '@/utils/apiValidation';
 import type { Company, AgentWorker, OrgChartNode, CreateAgentPayload } from '@/types';
 
 /**
@@ -53,62 +54,31 @@ interface BackendAgent {
   company_ref?: string | null;
 }
 
-/**
- * Normalize backend status strings into canonical AgentStatus values.
- * Backend may not send status at all, or use various naming conventions.
- */
-function normalizeAgentStatus(raw: string | undefined | null): AgentWorker['status'] {
-  if (!raw) return 'idle';
-  const s = raw.toLowerCase().trim();
-  const map: Record<string, AgentWorker['status']> = {
-    idle: 'idle',
-    busy: 'busy',
-    working: 'working',
-    executing: 'executing',
-    waiting: 'waiting',
-    waiting_for_approval: 'waiting',
-    awaiting: 'waiting',
-    paused: 'paused',
-    suspended: 'paused',
-    error: 'error',
-    errored: 'error',
-    failed: 'error',
-    crashed: 'error',
-    offline: 'offline',
-    stopped: 'offline',
-    disconnected: 'offline',
-    active: 'busy',
-    running: 'executing',
-    in_progress: 'working',
-  };
-  return map[s] ?? 'idle';
-}
-
 function mapAgent(raw: unknown): AgentWorker {
   const a = raw as BackendAgent;
   return {
-    name: a.name ?? 'unknown',
-    role: a.role ?? 'unknown',
-    supervisor: a.supervisor ?? null,
-    domain: a.domain ?? null,
-    system_prompt: a.system_prompt ?? null,
-    model: a.model ?? null,
-    fallback_model: a.fallback_model ?? null,
-    provider: a.provider ?? null,
-    tools: ensureArray<string>(a.tools),
-    skills: ensureArray<string>(a.skills),
-    modules: ensureArray(a.modules).map((m) => {
+    name: validateString(a?.name, 'agent.name', 'unknown'),
+    role: validateString(a?.role, 'agent.role', 'unknown'),
+    supervisor: a?.supervisor ?? null,
+    domain: a?.domain ?? null,
+    system_prompt: a?.system_prompt ?? null,
+    model: a?.model ?? null,
+    fallback_model: a?.fallback_model ?? null,
+    provider: a?.provider ?? null,
+    tools: ensureArray<string>(a?.tools),
+    skills: ensureArray<string>(a?.skills),
+    modules: ensureArray(a?.modules).map((m) => {
       if (typeof m === 'string') return m;
       if (m && typeof m === 'object' && 'name' in m) return (m as { name: string }).name;
       return String(m);
     }),
-    budget: a.budget ?? 0,
-    tokens_used: a.tokens_used ?? 0,
-    heartbeat_interval: a.heartbeat_interval ?? 60000,
-    status: normalizeAgentStatus(a.status),
-    context: a.context ?? {},
-    task_history: ensureArray<string>(a.task_history),
-    company_ref: a.company_ref ?? null,
+    budget: validateNumber(a?.budget, 'agent.budget'),
+    tokens_used: validateNumber(a?.tokens_used, 'agent.tokens_used'),
+    heartbeat_interval: validateNumber(a?.heartbeat_interval, 'agent.heartbeat_interval', 60000),
+    status: validateAgentStatus(a?.status) as AgentWorker['status'],
+    context: a?.context ?? {},
+    task_history: ensureArray<string>(a?.task_history),
+    company_ref: a?.company_ref ?? null,
   };
 }
 

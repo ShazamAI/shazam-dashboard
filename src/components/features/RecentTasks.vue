@@ -19,7 +19,11 @@ function formatAgent(task: Task): string {
 }
 
 function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
+  if (!dateStr) return 'unknown';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return 'unknown';
+  const diff = Date.now() - date.getTime();
+  if (diff < 0) return 'now';
   const seconds = Math.floor(diff / 1000);
   if (seconds < 60) return 'now';
   const minutes = Math.floor(seconds / 60);
@@ -81,7 +85,7 @@ function statusDotClass(status: string): string {
 
           <!-- Content -->
           <div class="min-w-0 flex-1">
-            <p class="truncate text-xs font-medium text-gray-300 transition-colors duration-200 group-hover:text-white">
+            <p class="truncate text-xs font-medium text-gray-300 transition-colors duration-200 group-hover:text-white" :title="task.title">
               {{ task.title }}
             </p>
             <div class="mt-0.5 flex items-center gap-2">

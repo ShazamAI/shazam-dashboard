@@ -1,5 +1,6 @@
 import { get, post, put, del } from './http';
 import { extractKey, ensureArray } from './utils';
+import { validateString, validateTaskStatus } from '@/utils/apiValidation';
 import type { Task, TaskFilter, CreateTaskPayload, PaginatedResult, Workflow, PipelineStage } from '@/types';
 
 /**
@@ -30,18 +31,18 @@ interface BackendTask {
 
 function mapTask(raw: BackendTask): Task {
   return {
-    id: raw.id,
-    title: raw.title,
+    id: validateString(raw.id, 'task.id'),
+    title: validateString(raw.title, 'task.title', 'Untitled'),
     description: raw.description ?? null,
-    status: raw.status as Task['status'],
+    status: validateTaskStatus(raw.status) as Task['status'],
     assigned_to: raw.assigned_to ?? null,
     created_by: raw.created_by ?? null,
     parent_task_id: raw.parent_task_id ?? null,
     depends_on: raw.depends_on ?? null,
     company: raw.company ?? null,
-    result: raw.result ?? null,
-    created_at: raw.created_at,
-    updated_at: raw.updated_at,
+    result: (typeof raw.result === 'string' ? raw.result : null) as string | null,
+    created_at: validateString(raw.created_at, 'task.created_at'),
+    updated_at: validateString(raw.updated_at, 'task.updated_at'),
     // Pipeline fields
     workflow: raw.workflow ?? null,
     pipeline: raw.pipeline ?? null,

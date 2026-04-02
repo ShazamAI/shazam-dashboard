@@ -107,6 +107,8 @@ const isActive = computed(() =>
             <span
               :class="statusDotClass(agent.status)"
               class="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-surface-card"
+              :aria-label="`Agent status: ${agent.status}`"
+              role="status"
             />
           </div>
 
@@ -214,7 +216,7 @@ const isActive = computed(() =>
       </div>
 
       <!-- Edit action -->
-      <AppButton variant="secondary" size="sm" block @click="emit('edit', agent)">
+      <AppButton variant="secondary" size="sm" block :aria-label="`Configure agent ${agent.name}`" @click="emit('edit', agent)">
         Configure Agent
       </AppButton>
     </div>

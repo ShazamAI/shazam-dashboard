@@ -1,82 +1,19 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useOrgChart } from '@/composables/useOrgChart';
+import { useOrgChart, STATUS_DISPLAY } from '@/composables/useOrgChart';
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue';
 import ErrorBoundary from '@/components/common/ErrorBoundary.vue';
 import EmptyState from '@/components/common/EmptyState.vue';
 import OrgTreeNode from '@/components/features/OrgTreeNode.vue';
-import type { OrgChartNode } from '@/types';
 
-const { orgChart, isLoading, error, navigateToAgent } = useOrgChart();
-
-// ─── Stats computed from tree ─────────────────────────
-function flattenNodes(nodes: OrgChartNode[]): OrgChartNode[] {
-  const result: OrgChartNode[] = [];
-  for (const n of nodes) {
-    result.push(n);
-    if (n.reports.length > 0) result.push(...flattenNodes(n.reports));
-  }
-  return result;
-}
-
-const allNodes = computed(() => flattenNodes(orgChart.value));
-const totalAgents = computed(() => allNodes.value.length);
-
-const statusCounts = computed(() => {
-  const counts: Record<string, number> = {};
-  for (const n of allNodes.value) {
-    counts[n.status] = (counts[n.status] ?? 0) + 1;
-  }
-  return counts;
-});
-
-// Domain grouping
-interface DomainInfo {
-  name: string;
-  count: number;
-  color: { dot: string; text: string; bg: string };
-}
-
-const DOMAIN_COLOR_MAP: Record<string, { dot: string; text: string; bg: string }> = {
-  dashboard: { dot: 'bg-violet-400', text: 'text-violet-400', bg: 'bg-violet-500/10' },
-  vscode: { dot: 'bg-sky-400', text: 'text-sky-400', bg: 'bg-sky-500/10' },
-  backend: { dot: 'bg-emerald-400', text: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-  frontend: { dot: 'bg-violet-400', text: 'text-violet-400', bg: 'bg-violet-500/10' },
-  infrastructure: { dot: 'bg-orange-400', text: 'text-orange-400', bg: 'bg-orange-500/10' },
-  design: { dot: 'bg-pink-400', text: 'text-pink-400', bg: 'bg-pink-500/10' },
-  research: { dot: 'bg-cyan-400', text: 'text-cyan-400', bg: 'bg-cyan-500/10' },
-  qa: { dot: 'bg-amber-400', text: 'text-amber-400', bg: 'bg-amber-500/10' },
-  management: { dot: 'bg-shazam-400', text: 'text-shazam-400', bg: 'bg-shazam-500/10' },
-};
-
-const DEFAULT_COLOR = { dot: 'bg-gray-500', text: 'text-gray-400', bg: 'bg-gray-500/10' };
-
-const domains = computed<DomainInfo[]>(() => {
-  const map = new Map<string, number>();
-  for (const n of allNodes.value) {
-    const d = n.domain ?? 'unassigned';
-    map.set(d, (map.get(d) ?? 0) + 1);
-  }
-  return Array.from(map.entries())
-    .sort((a, b) => b[1] - a[1])
-    .map(([name, count]) => ({
-      name,
-      count,
-      color: DOMAIN_COLOR_MAP[name.toLowerCase()] ?? DEFAULT_COLOR,
-    }));
-});
-
-// Status display config
-const STATUS_DISPLAY: Record<string, { dot: string; label: string }> = {
-  idle: { dot: 'bg-emerald-400', label: 'Idle' },
-  busy: { dot: 'bg-amber-400 animate-pulse', label: 'Busy' },
-  working: { dot: 'bg-amber-400 animate-pulse', label: 'Working' },
-  executing: { dot: 'bg-cyan-400 animate-pulse', label: 'Executing' },
-  waiting: { dot: 'bg-yellow-400 animate-pulse', label: 'Waiting' },
-  paused: { dot: 'bg-gray-500', label: 'Paused' },
-  error: { dot: 'bg-red-500', label: 'Error' },
-  offline: { dot: 'bg-gray-600', label: 'Offline' },
-};
+const {
+  orgChart,
+  isLoading,
+  error,
+  navigateToAgent,
+  totalAgents,
+  statusCounts,
+  domains,
+} = useOrgChart();
 </script>
 
 <template>
@@ -88,7 +25,7 @@ const STATUS_DISPLAY: Record<string, { dot: string; label: string }> = {
       <div>
         <div class="flex items-center gap-2.5 mb-1 sm:gap-3">
           <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-shazam-500/10 text-base sm:h-10 sm:w-10 sm:text-lg">
-            🏛️
+            &#127963;&#65039;
           </div>
           <div>
             <h1 class="page-title">Organization Chart</h1>
@@ -105,8 +42,8 @@ const STATUS_DISPLAY: Record<string, { dot: string; label: string }> = {
         </div>
         <div class="flex items-center gap-2 rounded-xl border border-gray-800 bg-surface-card px-3 py-1.5 sm:gap-3 sm:px-4 sm:py-2">
           <template v-for="(count, status) in statusCounts" :key="status">
-            <div class="flex items-center gap-1 sm:gap-1.5" :title="`${STATUS_DISPLAY[status]?.label ?? status}: ${count}`">
-              <span class="h-2 w-2 rounded-full" :class="STATUS_DISPLAY[status]?.dot ?? 'bg-gray-500'" />
+            <div class="flex items-center gap-1 sm:gap-1.5" :title="`${STATUS_DISPLAY[status]?.label ?? status}: ${count}`" :aria-label="`${STATUS_DISPLAY[status]?.label ?? status}: ${count} agents`">
+              <span role="img" :aria-label="`${STATUS_DISPLAY[status]?.label ?? status} status indicator`" class="h-2 w-2 rounded-full" :class="STATUS_DISPLAY[status]?.dot ?? 'bg-gray-500'" />
               <span class="text-xs font-semibold text-gray-300 sm:text-sm">{{ count }}</span>
             </div>
           </template>
@@ -135,10 +72,11 @@ const STATUS_DISPLAY: Record<string, { dot: string; label: string }> = {
         <div
           v-for="d in domains"
           :key="d.name"
+          :aria-label="`Domain: ${d.name}, ${d.count} agents`"
           class="flex items-center gap-1 rounded-lg px-2 py-0.5 transition-colors duration-200 hover:bg-gray-800/50 sm:gap-1.5 sm:px-2.5 sm:py-1"
           :class="d.color.bg"
         >
-          <span class="h-2 w-2 rounded-full" :class="d.color.dot" />
+          <span role="img" :aria-label="`${d.name} domain indicator`" class="h-2 w-2 rounded-full" :class="d.color.dot" />
           <span class="text-[11px] font-medium capitalize sm:text-xs" :class="d.color.text">{{ d.name }}</span>
           <span class="ml-0.5 text-[10px] font-semibold text-gray-600">{{ d.count }}</span>
         </div>
@@ -169,8 +107,9 @@ const STATUS_DISPLAY: Record<string, { dot: string; label: string }> = {
           v-for="(config, key) in STATUS_DISPLAY"
           :key="key"
           class="flex items-center gap-1 sm:gap-1.5"
+          :aria-label="`Status: ${config.label}`"
         >
-          <span class="h-2 w-2 rounded-full" :class="config.dot" />
+          <span role="img" :aria-label="`${config.label} status indicator`" class="h-2 w-2 rounded-full" :class="config.dot" />
           <span class="text-[11px] text-gray-500 sm:text-xs">{{ config.label }}</span>
         </div>
       </div>

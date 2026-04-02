@@ -9,6 +9,7 @@ import {
   deleteTask,
   approveAllTasks,
 } from '@/api/taskService';
+import { normalizeError } from '@/api/utils';
 import type { Task, CreateTaskPayload } from '@/types';
 
 // ─── Types ──────────────────────────────────────────────
@@ -19,6 +20,18 @@ export interface TaskActionCallbacks {
   onReload: (opts?: { silent?: boolean; page?: number }) => Promise<void>;
   toast: { success: (msg: string) => void; error: (msg: string) => void };
 }
+
+/** Statuses that support at least one action */
+export const ACTIONABLE_STATUSES = ['awaiting_approval', 'pending', 'in_progress', 'paused', 'failed'] as const;
+
+const ACTION_PAST_TENSE: Record<string, string> = {
+  approve: 'approved',
+  reject: 'rejected',
+  pause: 'paused',
+  resume: 'resumed',
+  retry: 'retried',
+  delete: 'deleted',
+};
 
 // ─── Composable ─────────────────────────────────────────
 
@@ -50,18 +63,19 @@ export function useTaskActions(callbacks: TaskActionCallbacks) {
     try {
       const result = await fn(taskId);
 
+      const pastTense = ACTION_PAST_TENSE[action] ?? `${action}d`;
       if (action === 'delete') {
         callbacks.onTaskRemoved(taskId);
         callbacks.toast.success('Task deleted');
       } else if (result && typeof result === 'object' && 'id' in result) {
         callbacks.onTaskUpdated(taskId, result as Task);
-        callbacks.toast.success(`Task ${action}d`);
+        callbacks.toast.success(`Task ${pastTense}`);
       } else {
         await callbacks.onReload();
-        callbacks.toast.success(`Task ${action}d`);
+        callbacks.toast.success(`Task ${pastTense}`);
       }
     } catch (err) {
-      callbacks.toast.error(err instanceof Error ? err.message : `Failed to ${action} task`);
+      callbacks.toast.error(normalizeError(err, `Failed to ${action} task`));
     } finally {
       const next = { ...actionLoading.value };
       delete next[taskId];
@@ -75,7 +89,7 @@ export function useTaskActions(callbacks: TaskActionCallbacks) {
       await callbacks.onReload();
       callbacks.toast.success(`Approved ${result.approved ?? 'all'} tasks`);
     } catch (err) {
-      callbacks.toast.error(err instanceof Error ? err.message : 'Failed to approve all');
+      callbacks.toast.error(normalizeError(err, 'Failed to approve all'));
     }
   }
 
@@ -96,7 +110,7 @@ export function useTaskActions(callbacks: TaskActionCallbacks) {
       callbacks.toast.success('Task created');
       await callbacks.onReload({ silent: true, page: 1 });
     } catch (err) {
-      callbacks.toast.error(err instanceof Error ? err.message : 'Failed to create task');
+      callbacks.toast.error(normalizeError(err, 'Failed to create task'));
     } finally {
       isCreating.value = false;
     }

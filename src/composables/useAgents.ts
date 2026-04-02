@@ -6,6 +6,7 @@ import {
   submitCreateAgent,
   submitUpdateAgent,
 } from '@/api/agentService';
+import { normalizeError } from '@/api/utils';
 import type { AgentWorker, CreateAgentPayload } from '@/types';
 
 const LOADING_TIMEOUT_MS = 8_000;
@@ -87,11 +88,11 @@ export function useAgents() {
   }
 
   function toggleTool(tool: string) {
-    const idx = formData.value.tools?.indexOf(tool) ?? -1;
-    if (idx >= 0) {
-      formData.value.tools?.splice(idx, 1);
+    const current = formData.value.tools ?? [];
+    if (current.includes(tool)) {
+      formData.value.tools = current.filter((t) => t !== tool);
     } else {
-      formData.value.tools = [...(formData.value.tools ?? []), tool];
+      formData.value.tools = [...current, tool];
     }
   }
 
@@ -102,7 +103,7 @@ export function useAgents() {
     try {
       agents.value = await loadAndEnrichAgents(activeCompany.value.name);
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to load agents';
+      error.value = normalizeError(err, 'Failed to load agents');
     }
   }
 
@@ -113,7 +114,7 @@ export function useAgents() {
         await fetchAgents();
       }
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to load data';
+      error.value = normalizeError(err, 'Failed to load data');
     } finally {
       isLoading.value = false;
     }
@@ -127,10 +128,10 @@ export function useAgents() {
     error.value = null;
     try {
       await submitCreateAgent(activeCompany.value.name, formData.value);
-      closeForm();
       await fetchAgents();
+      closeForm();
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to create agent';
+      error.value = normalizeError(err, 'Failed to create agent');
     } finally {
       isSubmitting.value = false;
     }
@@ -145,7 +146,7 @@ export function useAgents() {
       closeForm();
       await fetchAgents();
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to update agent';
+      error.value = normalizeError(err, 'Failed to update agent');
     } finally {
       isSubmitting.value = false;
     }
@@ -165,6 +166,8 @@ export function useAgents() {
 
     loadData().then(() => {
       if (loadingTimeout) clearTimeout(loadingTimeout);
+    }).catch((err) => {
+      console.warn('Agent loadData failed:', err);
     });
   });
 

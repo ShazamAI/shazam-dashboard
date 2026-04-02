@@ -1,3 +1,14 @@
+// ===== Project Types =====
+export interface Project {
+  name: string;
+  path: string;
+  status: 'running' | 'stopped';
+  config_file: string;
+  agents_count: number;
+  last_used: string | null;
+  registered_at: string | null;
+}
+
 // ===== Task Types =====
 export type TaskStatus =
   | 'pending'
@@ -40,12 +51,12 @@ export interface Task {
   parent_task_id: string | null;
   depends_on: string | null;
   company: string | null;
-  result: unknown;
+  result: string | null;
   created_at: string;
   updated_at: string;
   // Pipeline/workflow fields
   workflow?: string | null;
-  pipeline?: PipelineStage[] | null;
+  pipeline: PipelineStage[] | null;
   current_stage?: number | null;
   required_role?: string | null;
 }
@@ -110,7 +121,20 @@ export type EventType =
   | 'circuit_breaker_tripped'
   | 'circuit_breaker_reset'
   | 'heartbeat'
-  | string; // Accept unknown event types from backend
+  | 'agent_started'
+  | 'agent_stopped'
+  | 'agent_disconnected'
+  | 'agent_error'
+  | 'agent_crashed'
+  | 'agent_paused'
+  | 'agent_resumed'
+  | 'ralph_paused'
+  | 'ralph_resumed'
+  | 'company_started'
+  | 'company_stopped'
+  | 'company_updated'
+  | 'task_stage_advanced'
+  | 'unknown';
 
 export interface ShazamEvent {
   type: EventType;
@@ -120,6 +144,62 @@ export interface ShazamEvent {
   data: unknown;
   timestamp: string;
 }
+
+// ===== Event Data Types =====
+
+export interface AgentTextDeltaData {
+  text: string;
+  agent?: string;
+}
+
+export interface TaskStatusChangeData {
+  task_id?: string;
+  title?: string;
+  from?: string;
+  to?: string;
+  assigned_to?: string;
+  status?: string;
+  error?: string;
+}
+
+export interface ToolUseData {
+  tool_name?: string;
+  name?: string;
+  input?: unknown;
+  arguments?: unknown;
+  result?: unknown;
+  output?: unknown;
+  content?: unknown;
+}
+
+export interface CircuitBreakerData {
+  consecutive_failures?: number;
+  last_error?: string;
+  threshold?: number;
+}
+
+export interface MetricsUpdateData {
+  total_tokens_used?: number;
+  total_tasks?: number;
+  agents_busy?: number;
+}
+
+export interface AgentStatusChangeData {
+  agent?: string;
+  agent_name?: string;
+  from?: string;
+  to?: string;
+  status?: string;
+}
+
+export type EventData =
+  | AgentTextDeltaData
+  | TaskStatusChangeData
+  | ToolUseData
+  | CircuitBreakerData
+  | MetricsUpdateData
+  | AgentStatusChangeData
+  | Record<string, unknown>;
 
 // ===== Metrics Types =====
 export interface Metrics {
@@ -143,6 +223,7 @@ export interface OrgChartNode {
   supervisor: string | null;
   domain: string | null;
   reports: OrgChartNode[];
+  subagents?: string[];
 }
 
 // ===== Circuit Breaker Types =====
@@ -367,6 +448,68 @@ export interface SystemHealth {
   poll_interval: number;
   max_concurrent: number;
   uptime_seconds: number;
+}
+
+// ===== Canvas Types =====
+export interface CanvasStatsData {
+  totalTasks: number;
+  pending: number;
+  running: number;
+  completed: number;
+  failed: number;
+  cost: string;
+}
+
+export interface CanvasGitData {
+  branch: string;
+  status: string;
+}
+
+export interface CanvasBudgetData {
+  agents: Array<{ name: string; used: number; total: number }>;
+  totalCost: string;
+}
+
+export interface CanvasApprovalTask {
+  id: string;
+  title: string;
+  assignedTo: string;
+}
+
+export interface CanvasLiveEvent {
+  time: string;
+  agent: string;
+  text: string;
+  type: string;
+}
+
+export interface CanvasAgentOutput {
+  time: string;
+  type: string;
+  text: string;
+}
+
+export interface CanvasFileDiff {
+  path: string;
+  diffs: Array<{ type: 'add' | 'remove' | 'context'; text: string }>;
+}
+
+export interface CanvasContextMenu {
+  agent: string;
+  x: number;
+  y: number;
+}
+
+// ===== OrgChart Display Types =====
+export interface DomainInfo {
+  name: string;
+  count: number;
+  color: { dot: string; text: string; bg: string; hex?: string };
+}
+
+export interface StatusDisplayConfig {
+  dot: string;
+  label: string;
 }
 
 // ===== Plan Types =====

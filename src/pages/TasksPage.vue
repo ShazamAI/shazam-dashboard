@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { approveTask, rejectTask, pauseTask, resumeTask, retryTask, deleteTask } from '@/api/taskService';
 import { useActiveCompany } from '@/composables/useActiveCompany';
-import { useAgentStore } from '@/stores/agents';
 import { useWebSocket } from '@/composables/useWebSocket';
+import { fetchAgents } from '@/api/companyService';
 import { useToast } from '@/composables/useToast';
 import { useTaskPagination, STATUS_META } from '@/composables/useTaskPagination';
 import { useTaskActions } from '@/composables/useTaskActions';
+import { taskRefreshTick } from '@/composables/useRealtimeSync';
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue';
 import EmptyState from '@/components/common/EmptyState.vue';
 import AppButton from '@/components/common/Button.vue';
@@ -15,32 +15,15 @@ import Pagination from '@/components/common/Pagination.vue';
 import TaskTable from '@/components/features/TaskTable.vue';
 import TaskDetailPanel from '@/components/features/TaskDetailPanel.vue';
 import TaskCreateForm from '@/components/features/TaskCreateForm.vue';
+import TaskDependencyGraph from '@/components/features/TaskDependencyGraph.vue';
+import TaskExportImport from '@/components/features/TaskExportImport.vue';
 
 const router = useRouter();
 const toast = useToast();
 const { activeCompany, loadCompanies } = useActiveCompany();
-const { on: onWsEvent } = useWebSocket();
+const ws = useWebSocket();
 
 const pagination = useTaskPagination();
-
-async function retryAllFailed() {
-  try {
-    await import('@/api/taskService').then(m => m.approveAllTasks());
-    // Actually use the WS command for retry-all
-    const { useWebSocket } = await import('@/composables/useWebSocket');
-    const ws = useWebSocket();
-    ws.sendCommand('/retry-all');
-    pagination.loadTasks();
-  } catch { /* ignore */ }
-}
-
-async function approveAllPending() {
-  try {
-    const { approveAllTasks } = await import('@/api/taskService');
-    await approveAllTasks();
-    pagination.loadTasks();
-  } catch { /* ignore */ }
-}
 const taskActions = useTaskActions({
   onTaskUpdated: pagination.updateTaskInList,
   onTaskRemoved: pagination.removeTaskFromList,
@@ -48,21 +31,20 @@ const taskActions = useTaskActions({
   toast,
 });
 
-// Get agents from the agent store (loaded via API with roles)
-const agentStore = useAgentStore();
-const allAgents = computed(() => agentStore.agents);
+// Get agents directly from API for create-task dropdown
+const allAgents = ref<import('@/types').AgentWorker[]>([]);
 
-// Wire up WS events
-onWsEvent('*', (event) => pagination.handleTaskWsEvent(event));
+// Wire up WS events for optimistic in-place status updates only.
+// Full reloads are triggered by useRealtimeSync via taskRefreshTick.
+ws.on('*', (event) => pagination.handleTaskWsEvent(event));
 
-// Action dispatch: map action name → service function
-const ACTION_FNS: Record<string, (id: string) => Promise<unknown>> = {
-  approve: approveTask, reject: rejectTask, pause: pauseTask,
-  resume: resumeTask, retry: retryTask, delete: deleteTask,
-};
+// React to useRealtimeSync's debounced task refresh signal
+watch(taskRefreshTick, () => {
+  pagination.loadTasks({ silent: true });
+});
 
 function handleAction(taskId: string, action: string) {
-  const fn = ACTION_FNS[action];
+  const fn = taskActions.actions[action as keyof typeof taskActions.actions];
   if (fn) taskActions.executeAction(taskId, action, fn);
 }
 
@@ -74,24 +56,37 @@ function navigateToAgent(name: string) {
   router.push({ name: 'Agents', query: { agent: name } });
 }
 
-// Status icon map
+async function retryAllFailed() {
+  try {
+    ws.sendCommand('/retry-all');
+    pagination.loadTasks();
+  } catch (err) {
+    console.warn('retryAllFailed failed:', err);
+    toast.error('Failed to retry tasks');
+  }
+}
+
+// Status icon map (mobile-only visual indicator)
 const STATUS_ICONS: Record<string, string> = {
-  pending: '⏳',
-  in_progress: '🔄',
-  completed: '✅',
-  failed: '❌',
-  awaiting_approval: '🔔',
-  paused: '⏸️',
+  pending: '\u23F3',
+  in_progress: '\uD83D\uDD04',
+  completed: '\u2705',
+  failed: '\u274C',
+  awaiting_approval: '\uD83D\uDD14',
+  paused: '\u23F8\uFE0F',
 };
 
 const hasActiveFilters = computed(() =>
   !!pagination.searchQuery.value || !!pagination.statusFilter.value || !!pagination.agentFilter.value
 );
 
-onMounted(() => {
-  pagination.startLoadingTimeout(() => toast.warning('Loading timed out — backend may be unavailable'));
+onMounted(async () => {
+  pagination.startLoadingTimeout(() => toast.warning('Loading timed out \u2014 backend may be unavailable'));
   pagination.loadTasks().then(() => pagination.clearLoadingTimeout());
-  loadCompanies();
+  await loadCompanies();
+  if (activeCompany.value?.name) {
+    fetchAgents(activeCompany.value.name).then(a => { allAgents.value = a; }).catch(() => {});
+  }
 });
 
 // Reload tasks when active project changes
@@ -100,6 +95,7 @@ watch(
   (name, oldName) => {
     if (name && name !== oldName) {
       pagination.loadTasks({ page: 1 });
+      fetchAgents(name).then(a => { allAgents.value = a; }).catch(() => {});
     }
   }
 );
@@ -121,6 +117,7 @@ watch(
         </div>
       </div>
       <div class="flex items-center gap-2">
+        <TaskExportImport @imported="pagination.loadTasks()" />
         <AppButton v-if="pagination.statusCounts.value.awaiting_approval > 0" variant="info" size="sm" @click="taskActions.handleApproveAll">
           <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
@@ -135,9 +132,6 @@ watch(
         </AppButton>
         <AppButton v-if="pagination.statusCounts.value.failed > 0" variant="secondary" size="sm" @click="retryAllFailed">
           ↻ Retry Failed ({{ pagination.statusCounts.value.failed }})
-        </AppButton>
-        <AppButton v-if="pagination.statusCounts.value.awaiting_approval > 0" variant="secondary" size="sm" @click="approveAllPending">
-          ✓ Approve All ({{ pagination.statusCounts.value.awaiting_approval }})
         </AppButton>
       </div>
     </div>
@@ -191,11 +185,13 @@ watch(
           v-model="pagination.searchQuery.value"
           type="text"
           placeholder="Search tasks by title or ID..."
+          aria-label="Search tasks"
           class="w-full rounded-xl border border-gray-800 bg-gray-900/50 py-2.5 pl-10 pr-4 text-sm text-gray-300 placeholder-gray-600 transition-colors focus:border-shazam-500/50 focus:outline-none focus:ring-1 focus:ring-shazam-500/20"
         />
       </div>
       <select
         v-model="pagination.agentFilter.value"
+        aria-label="Filter by agent"
         class="rounded-xl border border-gray-800 bg-gray-900/50 px-4 py-2.5 text-sm text-gray-300 transition-colors focus:border-shazam-500/50 focus:outline-none focus:ring-1 focus:ring-shazam-500/20"
       >
         <option value="">All Agents</option>
@@ -211,6 +207,15 @@ watch(
           {{ pagination.paginationInfo.value.total }} task{{ pagination.paginationInfo.value.total !== 1 ? 's' : '' }}
         </span>
       </div>
+    </div>
+
+    <!-- Dependency Graph -->
+    <div v-if="!pagination.isLoading.value && pagination.tasks.value.length > 0" class="mb-4 sm:mb-6">
+      <TaskDependencyGraph
+        :tasks="pagination.tasks.value"
+        :selected-task-id="pagination.selectedTask.value?.id ?? null"
+        @select-task="pagination.selectTask"
+      />
     </div>
 
     <!-- Loading / Error / Empty -->
@@ -278,6 +283,7 @@ watch(
       <TaskDetailPanel
         v-if="pagination.selectedTask.value"
         :task="pagination.selectedTask.value"
+        :tasks="pagination.tasks.value"
         :action-loading="taskActions.actionLoading.value"
         @close="pagination.selectedTask.value = null"
         @navigate-agent="navigateToAgent"

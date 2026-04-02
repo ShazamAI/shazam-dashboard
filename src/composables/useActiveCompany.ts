@@ -1,6 +1,7 @@
 import { ref, readonly, computed } from 'vue';
 import type { Company } from '@/types';
 import { fetchCompanies } from '@/api/companyService';
+import { normalizeError } from '@/api/utils';
 
 // ─── Singleton state ──────────────────────────────────────
 const companies = ref<Company[]>([]);
@@ -52,7 +53,7 @@ async function loadCompanies(): Promise<Company[]> {
       });
     })
     .catch((err) => {
-      error.value = err instanceof Error ? err.message : 'Failed to load companies';
+      error.value = normalizeError(err, 'Failed to load companies');
       // Try health endpoint as fallback
       return fetchHealthCompanies().then((healthCompanies) => {
         companies.value = healthCompanies.map((name) => ({

@@ -1,5 +1,53 @@
 # Changelog
 
+## v1.0.0 (2026-04-02) — Subagents & Intelligence Release
+
+### Major Features
+- **Subagents Page** — configure 12 specialized subagent presets, assign per-agent, team presets, model selection, direct YAML save
+- **Spotlight Search (Cmd+K)** — global search across pages, agents, actions with keyboard navigation
+- **Create Task Modal** — create tasks directly from Dashboard without navigating away
+- **Agent Output Messaging** — send messages to agents, quick actions (Continue, Fix, Explain, Test, Commit)
+- **Diff Viewer** — inline code diff visualization with +/- coloring in Agent Output and Task Detail
+- **Cost Trend Chart** — SVG line chart tracking cost over time in Metrics
+- **Agent Performance Scoring** — grade A-F cards with suggestions per agent
+- **Task Dependency Graph** — interactive DAG visualization with SVG
+- **Export/Import Tasks** — JSON and CSV export, JSON import with bulk creation
+- **Context Window Monitor** — per-agent token usage progress bars
+- **Plans Page** — create, edit, refine, approve plans (no task creation until approval)
+- **Browser Notifications** — OS-level notifications for task complete/fail/circuit breaker
+- **Keyboard Shortcuts** — Cmd+1-5 for navigation
+- **Daemon Auto-Start** — Tauri app detects and starts daemon automatically
+- **Markdown Output Viewer** — formatted task results with delegate-to-agent dropdown
+
+### Architecture Improvements
+- **Stores eliminated** — removed 4 duplicate Pinia stores (agents, tasks, metrics, events), composables are the single pattern
+- **Event type safety** — eventGuards.ts with getEventData/getDataString/getDataNumber helpers
+- **Debounce centralized** — useRealtimeSync with tick-based refresh, no competing timers
+- **API response validation** — runtime validation with console.warn fallbacks
+- **Error handling standardized** — useErrorHandler composable, ErrorBoundary on all pages, normalizeError everywhere
+- **Full refactoring** — 25+ components/composables extracted, pages reduced 60-80%
+- **Shared constants** — colors.ts, languages.ts, timing.ts centralized
+
+### Bug Fixes
+- OrgChart status properly normalized
+- Configure agent loads and saves all fields
+- Token usage displays real costs per model
+- Task click on home opens detail panel
+- Agent edit no longer wipes other agents
+- Tasks load after daemon restart
+- Tool events show real names (not "unknown")
+- Spotlight scroll follows selection
+- Plan creation doesn't create tasks until approval
+- Delegate dropdown opens upward (not clipped)
+
+### Dashboard UX
+- Subagent hierarchy with mini-nodes in OrgChart
+- Subagent badge count in Canvas AgentNode
+- Toggle switches with correct sizing
+- Team presets informational (not clickable)
+- Inline confirmation bars (no native confirm())
+- Aria-labels throughout for accessibility
+
 ## v0.5.0 (2026-03-25)
 
 ### Features — Workflow Pipelines

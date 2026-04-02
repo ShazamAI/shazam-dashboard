@@ -166,6 +166,21 @@ function formatRole(role: string): string {
         </span>
       </div>
 
+      <!-- Subagent mini-nodes -->
+      <div v-if="node.subagents?.length" class="flex flex-col items-center mt-2 sm:mt-2.5">
+        <div class="h-2.5 w-px bg-gray-700/60" />
+        <div class="flex flex-wrap justify-center gap-1 max-w-full">
+          <div
+            v-for="sa in node.subagents"
+            :key="sa"
+            class="flex items-center justify-center rounded-lg border border-purple-500/20 bg-purple-500/5 px-1.5 py-0.5 transition-colors duration-200 hover:border-purple-500/40 hover:bg-purple-500/10"
+            :title="sa"
+          >
+            <span class="text-[7px] text-purple-400/70 font-medium sm:text-[8px]">{{ sa }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Expand/Collapse toggle — larger on mobile for touch -->
       <button
         v-if="hasChildren"

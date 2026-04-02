@@ -1,6 +1,7 @@
 import { fetchAgents, createAgent, updateAgent, fetchOrgChart } from './companyService';
 import { fetchSessionPool } from './configService';
 import { fetchTasks } from './taskService';
+import { post } from './http';
 import type { AgentWorker, AgentStatus, OrgChartNode, CreateAgentPayload } from '@/types';
 
 // ─── Re-exports for convenience ──────────────────────────
@@ -165,3 +166,26 @@ export const AVAILABLE_TOOLS = [
 ];
 
 export const AVAILABLE_PROVIDERS = ['claude_code', 'codex', 'cursor', 'gemini'];
+
+// ─── Agent Messaging ─────────────────────────────────────
+
+export interface SendMessageResponse {
+  status: 'executing' | 'queued';
+  message: string;
+}
+
+export async function sendMessageToAgent(
+  agentName: string,
+  message: string,
+  company?: string
+): Promise<SendMessageResponse> {
+  const response = await post<unknown>(
+    `/agents/${encodeURIComponent(agentName)}/message`,
+    { message, company }
+  );
+  const obj = (response ?? {}) as Record<string, unknown>;
+  return {
+    status: (obj.status as 'executing' | 'queued') ?? 'executing',
+    message: (obj.message as string) ?? 'Message sent',
+  };
+}

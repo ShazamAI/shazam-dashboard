@@ -4,11 +4,17 @@ import AppButton from '@/components/common/Button.vue';
 import { fetchWorkflows } from '@/api/taskService';
 import type { AgentWorker, CreateTaskPayload, Workflow } from '@/types';
 
+interface ComplexityWarning {
+  reasons: string[];
+  estimated: number;
+}
+
 interface Props {
   createForm: CreateTaskPayload;
   isCreating: boolean;
   companyName: string | null;
   agents: AgentWorker[];
+  complexityWarning?: ComplexityWarning | null;
 }
 
 defineProps<Props>();
@@ -16,14 +22,20 @@ defineProps<Props>();
 const emit = defineEmits<{
   submit: [];
   cancel: [];
+  forceCreate: [];
+  decompose: [];
 }>();
 
 const workflows = ref<Workflow[]>([]);
+const workflowLoadError = ref(false);
 
 onMounted(async () => {
   try {
     workflows.value = await fetchWorkflows();
-  } catch { /* ignore */ }
+  } catch (err) {
+    console.warn('Failed to load workflows:', err);
+    workflowLoadError.value = true;
+  }
 });
 </script>
 
@@ -70,6 +82,7 @@ onMounted(async () => {
               {{ w.name }} ({{ w.stages.length }} stages)
             </option>
           </select>
+          <p v-if="workflowLoadError" class="mt-1 text-xs text-yellow-500">Failed to load workflows. You can still create a task without one.</p>
         </div>
         <div v-if="createForm.workflow">
           <label class="form-label">Pipeline Preview</label>
@@ -96,6 +109,38 @@ onMounted(async () => {
         <label class="form-label">Depends On (task title)</label>
         <input v-model="createForm.depends_on" type="text" placeholder="Title of dependency task (optional)" class="input" />
       </div>
+      <!-- Complexity Warning -->
+      <div v-if="complexityWarning" class="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
+        <div class="flex items-center gap-2">
+          <span class="text-amber-400 text-sm">&#9889;</span>
+          <p class="text-xs font-medium text-amber-400">This task looks complex</p>
+        </div>
+        <ul class="text-[10px] text-amber-400/70 space-y-0.5 ml-5 list-disc">
+          <li v-for="reason in complexityWarning.reasons" :key="reason">{{ reason }}</li>
+        </ul>
+        <p class="text-[10px] text-amber-400/70">
+          Suggestion: Let the PM break this into ~{{ complexityWarning.estimated }} subtasks for better results.
+        </p>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            class="rounded-lg bg-shazam-500 px-3 py-1 text-[10px] text-white hover:bg-shazam-600 transition-colors"
+            :disabled="isCreating"
+            @click="emit('decompose')"
+          >
+            Let PM Decompose
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border border-gray-700 px-3 py-1 text-[10px] text-gray-400 hover:text-gray-300 hover:border-gray-600 transition-colors"
+            :disabled="isCreating"
+            @click="emit('forceCreate')"
+          >
+            Create Anyway
+          </button>
+        </div>
+      </div>
+
       <div class="flex justify-end gap-2 border-t border-gray-800 pt-4">
         <AppButton variant="secondary" size="sm" type="button" @click="emit('cancel')">Cancel</AppButton>
         <AppButton variant="primary" size="sm" type="submit" :loading="isCreating" :disabled="isCreating || !createForm.title.trim() || !companyName">

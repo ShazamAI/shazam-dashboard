@@ -77,10 +77,12 @@ const statusIcon: Record<string, string> = {
     <!-- Approve/Reject for awaiting tasks -->
     <div v-if="data.status === 'awaiting_approval'" class="flex gap-1 mt-2">
       <button
+        :aria-label="'Approve task: ' + data.title"
         class="flex-1 rounded bg-green-500/20 px-2 py-0.5 text-[10px] text-green-400 hover:bg-green-500/30"
         @click.stop="emit('approve', data.id)"
       >Approve</button>
       <button
+        :aria-label="'Reject task: ' + data.title"
         class="flex-1 rounded bg-red-500/20 px-2 py-0.5 text-[10px] text-red-400 hover:bg-red-500/30"
         @click.stop="emit('reject', data.id)"
       >Reject</button>

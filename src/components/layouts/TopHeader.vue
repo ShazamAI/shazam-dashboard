@@ -4,15 +4,26 @@ import { useRoute } from 'vue-router';
 import { useSidebar } from '@/composables/useSidebar';
 import { useWebSocket } from '@/composables/useWebSocket';
 import { useActiveCompany } from '@/composables/useActiveCompany';
+import { useNotifications } from '@/composables/useNotifications';
+import NotificationBell from '@/components/common/NotificationBell.vue';
 
 const route = useRoute();
 const { toggleMobile } = useSidebar();
 const ws = useWebSocket();
 const { activeCompany } = useActiveCompany();
+const { notificationsEnabled, permission, requestPermission } = useNotifications();
 
 const pageTitle = computed(() => (route.meta?.title as string) ?? 'Dashboard');
 
 const companyName = computed(() => activeCompany.value?.name ?? null);
+
+function toggleBrowserNotifications() {
+  if (permission.value === 'default') {
+    requestPermission();
+  } else {
+    notificationsEnabled.value = !notificationsEnabled.value;
+  }
+}
 </script>
 
 <template>
@@ -49,6 +60,37 @@ const companyName = computed(() => activeCompany.value?.name ?? null);
 
     <!-- Right section -->
     <div class="flex shrink-0 items-center gap-2 px-4 md:gap-3 md:px-6">
+      <!-- Browser notification toggle -->
+      <button
+        class="relative rounded-lg p-2 transition-colors"
+        :class="notificationsEnabled ? 'text-shazam-400 hover:bg-shazam-500/10' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-300'"
+        :title="notificationsEnabled ? 'Browser notifications on (click to disable)' : permission === 'denied' ? 'Notifications blocked by browser' : 'Enable browser notifications'"
+        @click="toggleBrowserNotifications"
+      >
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+          <path
+            v-if="!notificationsEnabled"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M9.143 17.082a24.248 24.248 0 005.714 0m-5.714 0a3 3 0 115.714 0M3.124 16.126c-.866 1.5.217 3.374 1.948 3.374h13.856c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L3.124 16.126z"
+          />
+          <path
+            v-else
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"
+          />
+        </svg>
+        <!-- Active dot -->
+        <span
+          v-if="notificationsEnabled"
+          class="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-shazam-400"
+        />
+      </button>
+
+      <!-- In-app notification bell -->
+      <NotificationBell />
+
       <!-- Connection status -->
       <div
         class="flex items-center gap-1.5 rounded-full px-2.5 py-1 transition-colors duration-200"

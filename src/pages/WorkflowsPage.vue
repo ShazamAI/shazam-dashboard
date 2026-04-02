@@ -1,240 +1,42 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
-import { VueFlow, useVueFlow } from '@vue-flow/core';
+import { onMounted } from 'vue';
+import { VueFlow } from '@vue-flow/core';
 import { Background } from '@vue-flow/background';
 import { Controls } from '@vue-flow/controls';
-import type { Node, Edge } from '@vue-flow/core';
-import { fetchWorkflows, saveWorkflow, createWorkflow, deleteWorkflow } from '@/api/taskService';
-import { useToast } from '@/composables/useToast';
+import { useWorkflowEditor } from '@/composables/useWorkflowEditor';
 import WorkflowStageNode from '@/components/canvas/WorkflowStageNode.vue';
 import AppButton from '@/components/common/Button.vue';
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue';
-import type { Workflow, WorkflowStage } from '@/types';
 
-const toast = useToast();
-const { fitView, onNodesInitialized } = useVueFlow();
+import ErrorBoundary from '@/components/common/ErrorBoundary.vue';
 
-// Auto-fit when nodes finish rendering
-onNodesInitialized(() => {
-  setTimeout(() => fitView({ padding: 0.4, duration: 300 }), 50);
-});
-
-const workflows = ref<Workflow[]>([]);
-const isLoading = ref(true);
-const selectedName = ref<string | null>(null);
-const isEditing = ref(false);
-const isSaving = ref(false);
-const showNewForm = ref(false);
-const newName = ref('');
-
-// Canvas state
-const nodes = ref<Node[]>([]);
-const edges = ref<Edge[]>([]);
-
-// Editable stages (working copy)
-const editStages = ref<WorkflowStage[]>([]);
-
-const selectedWorkflow = computed(() =>
-  workflows.value.find(w => w.name === selectedName.value) ?? null
-);
-
-const isBuiltIn = computed(() => {
-  const builtins = ['default', 'feature', 'hotfix', 'review-only', 'docs'];
-  return selectedName.value ? builtins.includes(selectedName.value) : false;
-});
-
-// ─── Load workflows ──────────────────────────────
-
-async function load() {
-  isLoading.value = true;
-  try {
-    workflows.value = await fetchWorkflows();
-    if (!selectedName.value && workflows.value.length > 0) {
-      selectedName.value = workflows.value[0]!.name;
-    }
-  } catch { /* ignore */ }
-  isLoading.value = false;
-}
-
-// ─── Build canvas from stages ────────────────────
-
-function buildCanvas(stages: WorkflowStage[]) {
-  const spacing = 280;
-  const totalWidth = stages.length * spacing;
-  const startX = Math.max(50, (800 - totalWidth) / 2);
-
-  nodes.value = stages.map((stage, i) => ({
-    id: `stage-${i}`,
-    type: 'workflow-stage',
-    position: { x: startX + i * spacing, y: 80 },
-    data: {
-      ...stage,
-      index: i,
-      isFirst: i === 0,
-      isLast: i === stages.length - 1,
-      editing: isEditing.value,
-    },
-  }));
-
-  edges.value = stages.slice(0, -1).map((_, i) => ({
-    id: `edge-${i}`,
-    source: `stage-${i}`,
-    target: `stage-${i + 1}`,
-    animated: true,
-    style: { stroke: '#4b5563', strokeWidth: 2 },
-    type: 'smoothstep',
-  }));
-
-  // Add on_reject edges (dashed, red)
-  stages.forEach((stage, i) => {
-    if (stage.on_reject) {
-      const targetIdx = stages.findIndex(s => s.name === stage.on_reject);
-      if (targetIdx >= 0 && targetIdx !== i) {
-        edges.value.push({
-          id: `reject-${i}`,
-          source: `stage-${i}`,
-          target: `stage-${targetIdx}`,
-          animated: false,
-          style: { stroke: '#ef4444', strokeWidth: 1.5, strokeDasharray: '5 5' },
-          type: 'smoothstep',
-          label: 'reject',
-          labelStyle: { fill: '#ef4444', fontSize: 9 },
-          labelBgStyle: { fill: '#111827' },
-        });
-      }
-    }
-  });
-
-  // fitView is handled by onNodesInitialized
-  setTimeout(() => fitView({ padding: 0.4, duration: 300 }), 200);
-}
-
-// ─── Watch selected workflow ─────────────────────
-
-watch(selectedName, (name) => {
-  isEditing.value = false;
-  showNewForm.value = false;
-  if (!name) {
-    nodes.value = [];
-    edges.value = [];
-    return;
-  }
-  const wf = workflows.value.find(w => w.name === name);
-  if (wf) {
-    editStages.value = JSON.parse(JSON.stringify(wf.stages));
-    buildCanvas(wf.stages);
-  }
-});
-
-// ─── Edit mode ───────────────────────────────────
-
-function startEdit() {
-  const wf = selectedWorkflow.value;
-  if (!wf) return;
-  editStages.value = JSON.parse(JSON.stringify(wf.stages));
-  isEditing.value = true;
-  buildCanvas(editStages.value);
-}
-
-function cancelEdit() {
-  isEditing.value = false;
-  const wf = selectedWorkflow.value;
-  if (wf) buildCanvas(wf.stages);
-}
-
-function updateStage(index: number, field: string, value: string) {
-  if (editStages.value[index]) {
-    (editStages.value[index] as Record<string, unknown>)[field] = value;
-    buildCanvas(editStages.value);
-  }
-}
-
-function removeStage(index: number) {
-  editStages.value.splice(index, 1);
-  buildCanvas(editStages.value);
-}
-
-function addStage() {
-  editStages.value.push({
-    name: `stage_${editStages.value.length + 1}`,
-    role: 'dev',
-    prompt_suffix: null,
-    on_reject: null,
-  });
-  buildCanvas(editStages.value);
-}
-
-async function save() {
-  if (!selectedName.value || editStages.value.length === 0) return;
-  isSaving.value = true;
-  try {
-    await saveWorkflow({ name: selectedName.value, stages: editStages.value });
-    // Update local cache
-    const idx = workflows.value.findIndex(w => w.name === selectedName.value);
-    if (idx >= 0) {
-      workflows.value[idx] = { name: selectedName.value, stages: JSON.parse(JSON.stringify(editStages.value)) };
-    }
-    isEditing.value = false;
-    buildCanvas(editStages.value);
-    toast.success('Workflow saved');
-  } catch (err) {
-    toast.error(err instanceof Error ? err.message : 'Failed to save');
-  }
-  isSaving.value = false;
-}
-
-// ─── Create new workflow ─────────────────────────
-
-async function handleCreate() {
-  const name = newName.value.trim().toLowerCase().replace(/\s+/g, '-');
-  if (!name) return;
-  isSaving.value = true;
-  try {
-    const newWf: Workflow = {
-      name,
-      stages: [
-        { name: 'develop', role: 'dev', prompt_suffix: null, on_reject: null },
-        { name: 'review', role: 'reviewer', prompt_suffix: null, on_reject: 'develop' },
-        { name: 'commit', role: 'dev', prompt_suffix: null, on_reject: null },
-      ],
-    };
-    await createWorkflow(newWf);
-    workflows.value.push(newWf);
-    selectedName.value = name;
-    showNewForm.value = false;
-    newName.value = '';
-    toast.success(`Workflow "${name}" created`);
-  } catch (err) {
-    toast.error(err instanceof Error ? err.message : 'Failed to create');
-  }
-  isSaving.value = false;
-}
-
-async function handleDelete() {
-  if (!selectedName.value || isBuiltIn.value) return;
-  try {
-    await deleteWorkflow(selectedName.value);
-    workflows.value = workflows.value.filter(w => w.name !== selectedName.value);
-    selectedName.value = workflows.value[0]?.name ?? null;
-    toast.success('Workflow deleted');
-  } catch (err) {
-    toast.error(err instanceof Error ? err.message : 'Failed to delete');
-  }
-}
-
-// ─── Role colors for list ────────────────────────
-
-const roleColorMap: Record<string, string> = {
-  dev: 'bg-blue-500', reviewer: 'bg-purple-500', qa: 'bg-amber-500',
-};
-
-function roleDot(role: string): string {
-  const lower = role.toLowerCase();
-  for (const [key, cls] of Object.entries(roleColorMap)) {
-    if (lower.includes(key)) return cls;
-  }
-  return 'bg-gray-500';
-}
+const {
+  workflows,
+  isLoading,
+  loadError,
+  selectedName,
+  isEditing,
+  isSaving,
+  showNewForm,
+  showDeleteConfirm,
+  newName,
+  nodes,
+  edges,
+  selectedWorkflow,
+  isBuiltIn,
+  load,
+  startEdit,
+  cancelEdit,
+  updateStage,
+  removeStage,
+  addStage,
+  save,
+  handleCreate,
+  confirmDelete,
+  cancelDelete,
+  handleDelete,
+  roleDot,
+} = useWorkflowEditor();
 
 onMounted(load);
 </script>
@@ -292,6 +94,8 @@ onMounted(load);
 
     <!-- Main canvas area -->
     <div class="flex-1 flex flex-col">
+      <ErrorBoundary :error="loadError" class="mx-4 mt-3" />
+
       <!-- Toolbar -->
       <div class="flex items-center justify-between border-b border-gray-800 bg-gray-900/30 px-4 py-2.5">
         <div class="flex items-center gap-3">
@@ -327,13 +131,27 @@ onMounted(load);
               </svg>
               Edit
             </AppButton>
-            <AppButton v-if="!isBuiltIn" variant="danger" size="xs" @click="handleDelete">
+            <AppButton v-if="!isBuiltIn" variant="danger" size="xs" @click="confirmDelete">
               <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
               Delete
             </AppButton>
           </template>
+        </div>
+      </div>
+
+      <!-- Delete confirmation bar -->
+      <div
+        v-if="showDeleteConfirm"
+        class="flex items-center justify-between border-b border-red-500/30 bg-red-900/20 px-4 py-2"
+      >
+        <span class="text-xs text-red-400">
+          Delete workflow "{{ selectedName }}"? This action cannot be undone.
+        </span>
+        <div class="flex items-center gap-2">
+          <AppButton variant="ghost" size="xs" @click="cancelDelete">Cancel</AppButton>
+          <AppButton variant="danger" size="xs" @click="handleDelete">Confirm Delete</AppButton>
         </div>
       </div>
 

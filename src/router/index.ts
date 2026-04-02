@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import type { RouteRecordRaw } from 'vue-router';
-import { useActiveCompany } from '@/composables/useActiveCompany';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -32,6 +31,12 @@ const routes: RouteRecordRaw[] = [
     name: 'Agents',
     component: () => import('@/pages/AgentsPage.vue'),
     meta: { title: 'Agents', icon: 'agents' },
+  },
+  {
+    path: '/subagents',
+    name: 'Subagents',
+    component: () => import('@/pages/SubagentsPage.vue'),
+    meta: { title: 'Subagents', icon: 'subagents' },
   },
   {
     path: '/org-chart',
@@ -87,6 +92,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/pages/SessionsPage.vue'),
     meta: { title: 'Sessions', icon: 'sessions' },
   },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    redirect: '/',
+  },
 ];
 
 const router = createRouter({
@@ -94,9 +104,12 @@ const router = createRouter({
   routes,
 });
 
-// Update document title on route change — uses the active project name dynamically
+// Module-level imports for singleton composable state (safe outside component context)
+import { useActiveCompany } from '@/composables/useActiveCompany';
+const { projectName } = useActiveCompany();
+
+// Update document title on route change
 router.afterEach((to) => {
-  const { projectName } = useActiveCompany();
   const title = (to.meta?.title as string) ?? 'Dashboard';
   document.title = `${title} — ${projectName.value}`;
 });

@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { onMounted } from 'vue';
 import { useMemoryTree } from '@/composables/useMemoryTree';
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue';
 import ErrorBoundary from '@/components/common/ErrorBoundary.vue';
 import EmptyState from '@/components/common/EmptyState.vue';
 import AppButton from '@/components/common/Button.vue';
 import MemoryTreeNodeVue from '@/components/features/MemoryTreeNode.vue';
+import MemoryFileViewer from '@/components/features/MemoryFileViewer.vue';
 
 const {
-  treeNodes, isLoading, error, expandedDirs, hasContent,
+  treeNodes, isLoading, error, expandedDirs, hasContent, totalFiles,
   selectedFile, isLoadingFile, fileError, hasFrontmatter,
   loadTree, toggleDir, expandAll, collapseAll, selectFile,
 } = useMemoryTree();
@@ -19,23 +20,6 @@ onMounted(async () => {
     expandAll();
   }
 });
-
-// Count total files in tree
-function countFiles(nodes: { type: string; children: unknown[] }[]): number {
-  let count = 0;
-  for (const n of nodes) {
-    if (n.type === 'file') count++;
-    if (Array.isArray(n.children)) count += countFiles(n.children as { type: string; children: unknown[] }[]);
-  }
-  return count;
-}
-
-const totalFiles = computed(() => countFiles(treeNodes.value));
-
-// Format frontmatter tags nicely
-function formatFrontmatterValue(val: string): string {
-  return val.length > 80 ? val.slice(0, 80) + '...' : val;
-}
 </script>
 
 <template>
@@ -107,58 +91,12 @@ function formatFrontmatterValue(val: string): string {
         </div>
 
         <!-- File Content Viewer -->
-        <div class="rounded-2xl border border-gray-800/60 bg-surface-card lg:col-span-8 xl:col-span-9">
-          <!-- Loading state -->
-          <div v-if="isLoadingFile" class="flex items-center justify-center p-12">
-            <LoadingSpinner size="sm" label="Loading file..." />
-          </div>
-
-          <!-- Error state -->
-          <div v-else-if="fileError" class="p-6 sm:p-8">
-            <ErrorBoundary :error="fileError" />
-          </div>
-
-          <!-- File content -->
-          <div v-else-if="selectedFile" class="flex flex-col">
-            <!-- File header bar -->
-            <div class="flex items-center gap-3 border-b border-gray-800/50 px-4 py-2.5 sm:px-5">
-              <svg class="h-4 w-4 shrink-0 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd" />
-              </svg>
-              <p class="min-w-0 truncate font-mono text-[11px] text-gray-400 sm:text-xs">{{ selectedFile.path }}</p>
-            </div>
-
-            <!-- Frontmatter badges -->
-            <div
-              v-if="hasFrontmatter"
-              class="border-b border-gray-800/50 bg-surface px-4 py-2.5 sm:px-5"
-            >
-              <div class="flex flex-wrap gap-2">
-                <div
-                  v-for="[key, val] in Object.entries(selectedFile.frontmatter)"
-                  :key="key"
-                  class="inline-flex items-center gap-1.5 rounded-lg border border-gray-800/50 bg-surface-card px-2.5 py-1"
-                >
-                  <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-600">{{ key }}</span>
-                  <span class="text-[10px] text-gray-400">{{ formatFrontmatterValue(val) }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Content area -->
-            <div class="max-h-[350px] overflow-y-auto p-4 scrollbar-thin sm:max-h-[calc(100vh-340px)] sm:p-5">
-              <pre class="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-gray-300 sm:text-xs">{{ selectedFile.content }}</pre>
-            </div>
-          </div>
-
-          <!-- Empty placeholder -->
-          <div v-else class="flex flex-col items-center justify-center gap-3 py-16 sm:py-24">
-            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-800/50 text-lg">
-              📄
-            </div>
-            <p class="text-xs text-gray-600 sm:text-sm">Select a file from the tree to view its contents</p>
-          </div>
-        </div>
+        <MemoryFileViewer
+          :selected-file="selectedFile"
+          :is-loading-file="isLoadingFile"
+          :file-error="fileError"
+          :has-frontmatter="hasFrontmatter"
+        />
       </div>
     </div>
   </div>

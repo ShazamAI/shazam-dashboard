@@ -1,4 +1,4 @@
-import { ref, readonly, shallowReadonly, computed, onUnmounted, type Ref } from 'vue';
+import { ref, readonly, shallowReadonly, computed, watch, onUnmounted, type Ref } from 'vue';
 import { fetchConfig, updateRalphLoopConfig, reloadPlugins } from '@/api/configService';
 import type { ShazamConfig, RalphLoopConfig, PluginConfig, DomainConfig, AgentYamlConfig } from '@/types';
 import { normalizeError } from '@/api/utils';
@@ -58,6 +58,16 @@ const techStackEntries = computed<[string, string | Record<string, string>][]>((
 });
 
 const plugins = computed<PluginConfig[]>(() => config.value?.plugins ?? []);
+
+// Sync editableConfig when config reloads externally
+watch(
+  () => config.value?.config,
+  (newConfig) => {
+    if (newConfig) {
+      editableConfig.value = { ...defaultRalphLoopConfig(), ...newConfig };
+    }
+  },
+);
 
 // ─── Actions ────────────────────────────────────────────
 

@@ -1,12 +1,26 @@
 <script setup lang="ts">
 /**
  * BudgetTracker — compact widget showing per-agent budget consumption
- * and total cost estimate. Reads from the agent store.
+ * and total cost estimate. Loads agents directly from the API.
  */
-import { computed } from 'vue';
-import { useAgentStore } from '@/stores/agents';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useActiveCompany } from '@/composables/useActiveCompany';
+import { fetchAgents } from '@/api/companyService';
+import { COST_PER_1K_TOKENS } from '@/api/metricsService';
+import type { AgentWorker } from '@/types';
 
-const agentStore = useAgentStore();
+const { activeCompany } = useActiveCompany();
+const agentList = ref<AgentWorker[]>([]);
+
+async function loadAgents() {
+  if (!activeCompany.value?.name) return;
+  try {
+    agentList.value = await fetchAgents(activeCompany.value.name);
+  } catch { /* silent */ }
+}
+
+onMounted(loadAgents);
+watch(() => activeCompany.value?.name, (name) => { if (name) loadAgents(); });
 
 interface BudgetEntry {
   name: string;
@@ -17,7 +31,7 @@ interface BudgetEntry {
 }
 
 const entries = computed<BudgetEntry[]>(() => {
-  return agentStore.agents
+  return agentList.value
     .filter((a) => a.budget > 0)
     .map((a) => {
       const percent = Math.min((a.tokens_used / a.budget) * 100, 100);
@@ -36,20 +50,20 @@ const entries = computed<BudgetEntry[]>(() => {
 });
 
 const totalTokensUsed = computed(() =>
-  agentStore.agents.reduce((sum, a) => sum + a.tokens_used, 0)
+  agentList.value.reduce((sum, a) => sum + a.tokens_used, 0)
 );
 
 const totalBudget = computed(() =>
-  agentStore.agents.reduce((sum, a) => sum + a.budget, 0)
+  agentList.value.reduce((sum, a) => sum + a.budget, 0)
 );
 
 const totalPercent = computed(() =>
   totalBudget.value > 0 ? (totalTokensUsed.value / totalBudget.value) * 100 : 0
 );
 
-// Rough cost estimate: ~$0.003 per 1K tokens (blended average)
+// Cost estimate using model-based pricing from metricsService
 const estimatedCost = computed(() => {
-  const cost = (totalTokensUsed.value / 1000) * 0.003;
+  const cost = (totalTokensUsed.value / 1000) * COST_PER_1K_TOKENS;
   if (cost < 0.01) return '< $0.01';
   return `$${cost.toFixed(2)}`;
 });

@@ -12,6 +12,7 @@ interface Props {
     tasksFailed: number;
     tasksPending?: number;
     tasksRunning?: number;
+    subagentCount?: number;
   };
 }
 
@@ -42,6 +43,8 @@ const bgClass = roleBg[props.data.role] || 'from-gray-500/20 to-gray-900/10 bord
 
 <template>
   <div
+    role="article"
+    :aria-label="'Agent ' + data.name + ', status: ' + data.status"
     class="rounded-xl border bg-gradient-to-b px-4 py-3 shadow-lg min-w-[180px] max-w-[220px] relative cursor-pointer"
     :class="bgClass"
   >
@@ -64,6 +67,11 @@ const bgClass = roleBg[props.data.role] || 'from-gray-500/20 to-gray-900/10 bord
         class="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white shadow-sm"
         title="Failed tasks"
       >{{ data.tasksFailed }}</span>
+      <span
+        v-if="data.subagentCount && data.subagentCount > 0"
+        class="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-purple-500 px-1 text-[9px] font-bold text-white shadow-sm"
+        :title="`${data.subagentCount} subagents`"
+      >{{ data.subagentCount }}</span>
     </div>
 
     <!-- Header -->

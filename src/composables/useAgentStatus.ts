@@ -72,7 +72,7 @@ export function useAgentStatus(agents: Ref<AgentWorker[] | undefined>) {
 
   // ─── WebSocket handler ───────────────────────────────
 
-  ws.on('*', (event) => {
+  const unsubscribeWs = ws.on('*', (event) => {
     const data = (event.data && typeof event.data === 'object' ? event.data : {}) as Record<string, unknown>;
     const agentName = extractAgentName(event);
 
@@ -136,7 +136,13 @@ export function useAgentStatus(agents: Ref<AgentWorker[] | undefined>) {
 
   onMounted(() => {
     sparklineTimer = setInterval(() => {
+      // Clean up orphaned sparkline data for agents no longer in the list
+      const agentNames = new Set(agents.value?.map((a) => a.name) ?? []);
       for (const name of Object.keys(sparklineData.value)) {
+        if (!agentNames.has(name)) {
+          delete sparklineData.value[name];
+          continue;
+        }
         const arr = sparklineData.value[name];
         if (arr) {
           arr.push(0);
@@ -148,6 +154,7 @@ export function useAgentStatus(agents: Ref<AgentWorker[] | undefined>) {
 
   onUnmounted(() => {
     if (sparklineTimer) clearInterval(sparklineTimer);
+    unsubscribeWs();
   });
 
   return {

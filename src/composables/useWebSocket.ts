@@ -11,9 +11,12 @@ const reconnectAttempts = ref(0);
 
 let socket: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let isDestroyed = false;
 let activeConsumers = 0;
 let subscribedCompany: string | null = null;
+
+const MAX_EVENTS = 100;
 
 const listeners = new Map<EventType | '*', Set<EventHandler>>();
 
@@ -27,6 +30,35 @@ function on(eventType: EventType | '*', handler: EventHandler): () => void {
   return () => {
     listeners.get(eventType)?.delete(handler);
   };
+}
+
+function removeAllListeners() {
+  listeners.clear();
+}
+
+function startHeartbeat() {
+  stopHeartbeat();
+  heartbeatTimer = setInterval(() => {
+    if (socket?.readyState === WebSocket.OPEN) {
+      send({ type: 'ping' });
+    }
+  }, 30_000);
+}
+
+function stopHeartbeat() {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+}
+
+function pushEvent(normalized: ShazamEvent) {
+  lastEvent.value = normalized;
+  events.value.push(normalized);
+  if (events.value.length > MAX_EVENTS) {
+    events.value.shift();
+  }
+  emit(normalized);
 }
 
 function emit(event: ShazamEvent) {
@@ -118,7 +150,7 @@ function normalizeEvent(raw: unknown): ShazamEvent | null {
   const taskId = (obj.task_id ?? dataObj.task_id ?? null) as string | null;
 
   return {
-    type: eventType,
+    type: eventType as EventType,
     agent,
     company,
     task_id: taskId,
@@ -128,7 +160,9 @@ function normalizeEvent(raw: unknown): ShazamEvent | null {
 }
 
 async function connect() {
-  if (isDestroyed) return;
+  if (isDestroyed) {
+    isDestroyed = false;
+  }
 
   const isTauri = typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window);
   const url = isTauri ? 'ws://127.0.0.1:4040/ws' : `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`;
@@ -150,20 +184,38 @@ async function connect() {
       }
 
       // Store a proxy object so send() works uniformly
-      socket = {
+      const proxy: Record<string, unknown> = {
         readyState: WebSocket.OPEN,
-        send: (data: string) => tauriWs.send(data),
+        send: (d: string) => tauriWs.send(d),
         close: () => tauriWs.disconnect(),
         onclose: null,
         onerror: null,
         onmessage: null,
         onopen: null,
-      } as unknown as WebSocket;
+        // WebSocket constants
+        CONNECTING: 0,
+        OPEN: 1,
+        CLOSING: 2,
+        CLOSED: 3,
+        url,
+        protocol: '',
+        extensions: '',
+        bufferedAmount: 0,
+        binaryType: 'blob',
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      };
+      socket = proxy as unknown as WebSocket;
+
+      startHeartbeat();
 
       tauriWs.addListener((msg) => {
         if (msg.type === 'Close') {
           isConnected.value = false;
+          proxy.readyState = WebSocket.CLOSED;
           socket = null;
+          stopHeartbeat();
           scheduleReconnect();
           return;
         }
@@ -173,9 +225,7 @@ async function connect() {
           const parsed = JSON.parse(msg.data) as unknown;
           const normalized = normalizeEvent(parsed);
           if (!normalized) return;
-          lastEvent.value = normalized;
-          events.value = [...events.value.slice(-99), normalized];
-          emit(normalized);
+          pushEvent(normalized);
         } catch {
           // skip
         }
@@ -193,6 +243,7 @@ async function connect() {
       socket.onopen = () => {
         isConnected.value = true;
         reconnectAttempts.value = 0;
+        startHeartbeat();
         if (subscribedCompany) {
           send({ action: 'subscribe', company: subscribedCompany });
         }
@@ -203,9 +254,7 @@ async function connect() {
           const parsed = JSON.parse(messageEvent.data as string) as unknown;
           const normalized = normalizeEvent(parsed);
           if (!normalized) return;
-          lastEvent.value = normalized;
-          events.value = [...events.value.slice(-99), normalized];
-          emit(normalized);
+          pushEvent(normalized);
         } catch {
           // skip
         }
@@ -213,6 +262,7 @@ async function connect() {
 
       socket.onclose = () => {
         isConnected.value = false;
+        stopHeartbeat();
         scheduleReconnect();
       };
 
@@ -228,15 +278,12 @@ async function connect() {
 function scheduleReconnect() {
   if (isDestroyed) return;
 
-  const maxAttempts = 10;
   const baseInterval = 3000;
-
-  if (reconnectAttempts.value >= maxAttempts) return;
 
   if (reconnectTimer) clearTimeout(reconnectTimer);
 
-  // Exponential backoff: 3s, 6s, 12s... capped at 30s
-  const delay = Math.min(baseInterval * Math.pow(2, reconnectAttempts.value), 30_000);
+  // Exponential backoff: 3s, 6s, 12s, 24s, 48s, 60s (capped)
+  const delay = Math.min(baseInterval * Math.pow(2, reconnectAttempts.value), 60_000);
 
   reconnectTimer = setTimeout(() => {
     reconnectAttempts.value++;
@@ -246,6 +293,7 @@ function scheduleReconnect() {
 
 function disconnect() {
   isDestroyed = true;
+  stopHeartbeat();
   if (reconnectTimer) clearTimeout(reconnectTimer);
   if (socket) {
     socket.onclose = null;
@@ -297,6 +345,7 @@ export function useWebSocket() {
     reconnectAttempts: readonly(reconnectAttempts),
     on: onScoped,
     send,
+    removeAllListeners,
     connect() {
       isDestroyed = false;
       connect();

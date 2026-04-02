@@ -3,6 +3,8 @@ import { fetchMemoryTree, fetchMemoryFile } from '@/api/memoryService';
 import { normalizeError } from '@/api/utils';
 import type { MemoryTreeNode, MemoryFileContent } from '@/types';
 
+const MAX_DEPTH = 10;
+
 /**
  * Composable for memory browser tree state, file loading, and expansion control.
  *
@@ -13,18 +15,18 @@ import type { MemoryTreeNode, MemoryFileContent } from '@/types';
  * - Selected file loading with error handling
  */
 export function useMemoryTree() {
-  // ─── Tree State ──────────────────────────────────────────
+  // --- Tree State ---
   const tree = ref<MemoryTreeNode[]>([]);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
   const expandedDirs = ref<Set<string>>(new Set());
 
-  // ─── File State ──────────────────────────────────────────
+  // --- File State ---
   const selectedFile = ref<MemoryFileContent | null>(null);
   const isLoadingFile = ref(false);
   const fileError = ref<string | null>(null);
 
-  // ─── Derived State ───────────────────────────────────────
+  // --- Derived State ---
   const treeNodes = computed(() => tree.value);
   const hasContent = computed(() => tree.value.length > 0);
   const hasFrontmatter = computed(() =>
@@ -33,23 +35,38 @@ export function useMemoryTree() {
       : false,
   );
 
-  // ─── Tree Traversal ──────────────────────────────────────
+  /** Count total files across the entire tree. */
+  const totalFiles = computed(() => countFilesInTree(tree.value));
 
-  /** Recursively collect all directory paths from a tree. */
-  function collectDirPaths(nodes: MemoryTreeNode[]): string[] {
+  function countFilesInTree(nodes: MemoryTreeNode[]): number {
+    let count = 0;
+    for (const n of nodes) {
+      if (n.type === 'file') count++;
+      if (Array.isArray(n.children) && n.children.length > 0) {
+        count += countFilesInTree(n.children);
+      }
+    }
+    return count;
+  }
+
+  // --- Tree Traversal ---
+
+  /** Recursively collect all directory paths from a tree, with depth guard. */
+  function collectDirPaths(nodes: MemoryTreeNode[], depth = 0): string[] {
+    if (depth >= MAX_DEPTH) return [];
     const paths: string[] = [];
     for (const node of nodes) {
       if (node.type === 'directory') {
         paths.push(node.path);
         if (Array.isArray(node.children) && node.children.length > 0) {
-          paths.push(...collectDirPaths(node.children));
+          paths.push(...collectDirPaths(node.children, depth + 1));
         }
       }
     }
     return paths;
   }
 
-  // ─── Actions ─────────────────────────────────────────────
+  // --- Actions ---
 
   /** Load the full memory tree from the backend. */
   async function loadTree(): Promise<void> {
@@ -57,8 +74,13 @@ export function useMemoryTree() {
     error.value = null;
     try {
       tree.value = await fetchMemoryTree();
+      if (tree.value.length === 0) {
+        // Empty tree is not an error, just no data
+        error.value = null;
+      }
     } catch (err) {
       error.value = normalizeError(err, 'Failed to load memory tree');
+      tree.value = [];
     } finally {
       isLoading.value = false;
     }
@@ -110,6 +132,7 @@ export function useMemoryTree() {
     error: readonly(error),
     expandedDirs: expandedDirs as Ref<Set<string>>,
     hasContent,
+    totalFiles,
 
     // File
     selectedFile: readonly(selectedFile),

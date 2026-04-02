@@ -1,7 +1,10 @@
 import { ref, readonly } from 'vue';
 import type { ShazamEvent, FeedItem, EventType } from '@/types';
+import { getEventData, getEventDataOrString, getDataString } from '@/utils/eventGuards';
 
-const COST_PER_1K_TOKENS = 0.003;
+import { COST_PER_1K_TOKENS } from '@/api/metricsService';
+const MAX_BUFFER_SIZE = 10 * 1024; // 10KB per buffer
+const MAX_BUFFER_COUNT = 100;
 
 let feedIdCounter = 0;
 
@@ -16,59 +19,71 @@ export function useEventFeed() {
   const totalCost = ref(0);
 
   function formatEventContent(event: ShazamEvent): string {
-    const data = event.data as Record<string, unknown> | string | null;
+    const data = getEventDataOrString(event);
+    const d = getEventData(event);
     switch (event.type) {
       case 'agent_text_delta':
-        return typeof data === 'string' ? data : (data as Record<string, unknown>)?.text as string ?? '';
+        return typeof data === 'string' ? data : getDataString(event, 'text');
       case 'agent_text_complete':
       case 'agent_output':
-        return typeof data === 'string' ? data : (data as Record<string, unknown>)?.text as string
-          ?? (data as Record<string, unknown>)?.output as string ?? '[complete]';
+        return typeof data === 'string' ? data : getDataString(event, 'text') || getDataString(event, 'output') || '[complete]';
       case 'tool_use':
       case 'tool_result': {
-        const d = data as Record<string, unknown> | null;
-        const toolName = d?.tool_name ?? d?.name ?? 'unknown';
-        const input = d?.input ?? d?.result;
-        const inputSummary = input
-          ? JSON.stringify(input).slice(0, 120) + (JSON.stringify(input).length > 120 ? '...' : '')
-          : '';
+        const toolName = getDataString(event, 'tool_name')
+          || getDataString(event, 'name')
+          || getDataString(event, 'title')?.split(':')[0]?.trim()
+          || 'unknown';
+        const inputRaw = d.input ?? d.result ?? d.arguments;
+        const inputSummary = inputRaw
+          ? JSON.stringify(inputRaw).slice(0, 120) + (JSON.stringify(inputRaw).length > 120 ? '...' : '')
+          : getDataString(event, 'text')?.slice(0, 120) || '';
         return `Tool: ${toolName}${inputSummary ? ` — ${inputSummary}` : ''}`;
       }
       case 'task_status_change': {
-        const d = data as Record<string, unknown> | null;
-        return `Task ${d?.task_id ?? event.task_id ?? ''}: ${d?.from ?? '?'} → ${d?.to ?? d?.status ?? '?'}${d?.title ? ` (${d.title})` : ''}`;
+        const taskId = getDataString(event, 'task_id') || event.task_id || '';
+        const from = getDataString(event, 'from', '?');
+        const to = getDataString(event, 'to') || getDataString(event, 'status', '?');
+        const title = getDataString(event, 'title');
+        return `Task ${taskId}: ${from} → ${to}${title ? ` (${title})` : ''}`;
       }
       case 'task_completed': {
-        const d = data as Record<string, unknown> | null;
-        return `Task ${d?.task_id ?? event.task_id ?? ''} completed${d?.title ? ` — ${d.title}` : ''}`;
+        const taskId = getDataString(event, 'task_id') || event.task_id || '';
+        const title = getDataString(event, 'title');
+        return `Task ${taskId} completed${title ? ` — ${title}` : ''}`;
       }
       case 'task_started': {
-        const d = data as Record<string, unknown> | null;
-        return `Task ${d?.task_id ?? event.task_id ?? ''} started${d?.title ? ` — ${d.title}` : ''}${d?.assigned_to ? ` (${d.assigned_to})` : ''}`;
+        const taskId = getDataString(event, 'task_id') || event.task_id || '';
+        const title = getDataString(event, 'title');
+        const assignedTo = getDataString(event, 'assigned_to');
+        return `Task ${taskId} started${title ? ` — ${title}` : ''}${assignedTo ? ` (${assignedTo})` : ''}`;
       }
       case 'task_failed': {
-        const d = data as Record<string, unknown> | null;
-        return `Task ${d?.task_id ?? event.task_id ?? ''} FAILED${d?.error ? ` — ${d.error}` : ''}${d?.title ? ` (${d.title})` : ''}`;
+        const taskId = getDataString(event, 'task_id') || event.task_id || '';
+        const error = getDataString(event, 'error');
+        const title = getDataString(event, 'title');
+        return `Task ${taskId} FAILED${error ? ` — ${error}` : ''}${title ? ` (${title})` : ''}`;
       }
       case 'task_created': {
-        const d = data as Record<string, unknown> | null;
-        return `Task created: ${d?.title ?? d?.task_id ?? event.task_id ?? 'unknown'}`;
+        const title = getDataString(event, 'title') || getDataString(event, 'task_id') || event.task_id || 'unknown';
+        return `Task created: ${title}`;
       }
       case 'agent_status_change': {
-        const d = data as Record<string, unknown> | null;
-        return `Agent ${event.agent ?? d?.agent ?? 'unknown'}: ${d?.from ?? '?'} → ${d?.to ?? d?.status ?? '?'}`;
+        const agentName = event.agent ?? getDataString(event, 'agent', 'unknown');
+        const from = getDataString(event, 'from', '?');
+        const to = getDataString(event, 'to') || getDataString(event, 'status', '?');
+        return `Agent ${agentName}: ${from} → ${to}`;
       }
       case 'metrics_update': {
-        const d = data as Record<string, unknown> | null;
         const parts: string[] = [];
-        if (d?.total_tasks !== undefined) parts.push(`tasks: ${d.total_tasks}`);
-        if (d?.agents_busy !== undefined) parts.push(`busy: ${d.agents_busy}`);
-        if (d?.total_tokens_used !== undefined) parts.push(`tokens: ${d.total_tokens_used}`);
+        if (d.total_tasks !== undefined) parts.push(`tasks: ${d.total_tasks}`);
+        if (d.agents_busy !== undefined) parts.push(`busy: ${d.agents_busy}`);
+        if (d.total_tokens_used !== undefined) parts.push(`tokens: ${d.total_tokens_used}`);
         return parts.length > 0 ? `Metrics: ${parts.join(', ')}` : 'Metrics updated';
       }
       case 'circuit_breaker_tripped': {
-        const d = data as Record<string, unknown> | null;
-        return `Circuit breaker TRIPPED — ${d?.consecutive_failures ?? '?'} consecutive failures. Last error: ${d?.last_error ?? 'unknown'}`;
+        const failures = d.consecutive_failures ?? '?';
+        const lastError = getDataString(event, 'last_error', 'unknown');
+        return `Circuit breaker TRIPPED — ${failures} consecutive failures. Last error: ${lastError}`;
       }
       case 'circuit_breaker_reset':
         return 'Circuit breaker RESET — system recovered';
@@ -80,7 +95,6 @@ export function useEventFeed() {
         // Generic handler for any unrecognized event type
         if (typeof data === 'string') return data;
         if (data && typeof data === 'object') {
-          const d = data as Record<string, unknown>;
           // Try common content fields
           const content = d.message ?? d.text ?? d.content ?? d.output ?? d.description;
           if (typeof content === 'string') return content;
@@ -94,6 +108,14 @@ export function useEventFeed() {
   }
 
   function processEvent(event: ShazamEvent) {
+    try {
+      processEventInner(event);
+    } catch (err) {
+      console.warn('[useEventFeed] Error processing event:', err);
+    }
+  }
+
+  function processEventInner(event: ShazamEvent) {
     // Skip heartbeat events from cluttering the feed
     if (event.type === 'heartbeat') return;
 
@@ -101,7 +123,13 @@ export function useEventFeed() {
       const key = getStreamKey(event);
       const deltaText = formatEventContent(event);
       const existing = streamingBuffers.value.get(key) ?? '';
-      const updated = existing + deltaText;
+      const updated = (existing + deltaText).slice(0, MAX_BUFFER_SIZE);
+
+      // Cap total buffer count
+      if (!streamingBuffers.value.has(key) && streamingBuffers.value.size >= MAX_BUFFER_COUNT) {
+        const oldest = streamingBuffers.value.keys().next().value;
+        if (oldest !== undefined) streamingBuffers.value.delete(oldest);
+      }
       streamingBuffers.value.set(key, updated);
 
       const existingItem = feedItems.value.find(
@@ -151,7 +179,7 @@ export function useEventFeed() {
       timestamp: event.timestamp,
       isStreaming: false,
       taskId: event.task_id,
-      meta: (event.data as Record<string, unknown>) ?? {},
+      meta: getEventData(event),
     });
 
     // Cap at 500 items

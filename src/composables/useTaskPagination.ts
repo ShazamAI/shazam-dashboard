@@ -1,11 +1,14 @@
 import { ref, computed, watch, onUnmounted } from 'vue';
 import { fetchTasks } from '@/api/taskService';
 import { useActiveCompany } from '@/composables/useActiveCompany';
+import { normalizeError } from '@/api/utils';
 import type { Task, TaskStatus, TaskFilter } from '@/types';
 
 // ─── Constants ──────────────────────────────────────────
 
-const REFRESH_DEBOUNCE_MS = 300;
+import { DEBOUNCE } from '@/constants/timing';
+
+const REFRESH_DEBOUNCE_MS = DEBOUNCE.TASK_REFRESH;
 const LOAD_TIMEOUT_MS = 8_000;
 
 export const STATUS_META: { value: TaskStatus; label: string; color: string }[] = [
@@ -81,14 +84,20 @@ export function useTaskPagination() {
     return { start, end, total };
   });
 
-  const statusCounts = computed(() => ({
-    pending: tasks.value.filter((t) => t.status === 'pending').length,
-    in_progress: tasks.value.filter((t) => t.status === 'in_progress').length,
-    completed: tasks.value.filter((t) => t.status === 'completed').length,
-    failed: tasks.value.filter((t) => t.status === 'failed').length,
-    awaiting_approval: tasks.value.filter((t) => t.status === 'awaiting_approval').length,
-    paused: tasks.value.filter((t) => t.status === 'paused').length,
-  }));
+  const statusCounts = computed<Record<TaskStatus, number>>(() => {
+    const counts = {
+      pending: 0,
+      in_progress: 0,
+      completed: 0,
+      failed: 0,
+      awaiting_approval: 0,
+      paused: 0,
+    };
+    for (const t of tasks.value) {
+      if (t.status in counts) counts[t.status as TaskStatus]++;
+    }
+    return counts;
+  });
 
   const uniqueAgents = computed(() => {
     const agents = new Set<string>();
@@ -134,7 +143,7 @@ export function useTaskPagination() {
       }
       skipPageWatch = false;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to load tasks';
+      const msg = normalizeError(err, 'Failed to load tasks');
       error.value = msg;
       if (!isSilent) throw err;
     } finally {
@@ -160,12 +169,13 @@ export function useTaskPagination() {
     const taskId = data?.task_id ?? event.task_id;
 
     if (!taskId) {
-      if (event.type === 'task_created') scheduleRefresh();
+      // New task created but no ID — full reload handled by taskRefreshTick watcher
       return;
     }
 
     const idx = tasks.value.findIndex((t) => t.id === taskId);
     if (idx !== -1) {
+      // Optimistic in-place update for tasks already visible
       if (data?.task) {
         tasks.value[idx] = data.task;
       } else {
@@ -179,9 +189,8 @@ export function useTaskPagination() {
       if (updated && selectedTask.value?.id === taskId) {
         selectedTask.value = updated;
       }
-    } else {
-      scheduleRefresh();
     }
+    // If task not in current page, the taskRefreshTick watcher will handle the reload
   }
 
   // ─── Task mutation helpers ──────────────────────────
@@ -205,7 +214,7 @@ export function useTaskPagination() {
 
   // ─── Watchers ───────────────────────────────────────
 
-  watch([statusFilter, agentFilter], () => {
+  watch([statusFilter, agentFilter, pageSize], () => {
     selectedTask.value = null;
     skipPageWatch = true;
     currentPage.value = 1;
@@ -215,12 +224,6 @@ export function useTaskPagination() {
   watch(currentPage, (newPage) => {
     if (skipPageWatch) return;
     loadTasks({ silent: true, page: newPage });
-  });
-
-  watch(pageSize, () => {
-    skipPageWatch = true;
-    currentPage.value = 1;
-    loadTasks({ page: 1 }).finally(() => { skipPageWatch = false; });
   });
 
   watch(searchQuery, () => {
