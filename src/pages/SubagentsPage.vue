@@ -102,21 +102,6 @@ function showToast(msg: string) {
   }, 3000);
 }
 
-function applyTeamPreset(key: string) {
-  const preset = TEAM_PRESETS[key];
-  if (!preset) return;
-
-  // Disable all first
-  for (const sa of subagents.value) {
-    sa.enabled = false;
-  }
-  // Enable the ones in the preset
-  for (const name of preset.subagents) {
-    const sa = subagents.value.find((s) => s.name === name);
-    if (sa) sa.enabled = true;
-  }
-  showToast(`Applied "${preset.name}" preset`);
-}
 
 function addCustomSubagent() {
   if (!customForm.value.name.trim()) return;
